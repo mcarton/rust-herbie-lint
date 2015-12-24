@@ -2,6 +2,9 @@
 #![feature(plugin_registrar)]
 #![feature(rustc_private)]
 
+#![cfg_attr(feature="clippy", feature(plugin))]
+#![cfg_attr(feature="clippy", plugin(clippy))]
+
 extern crate rusqlite;
 #[macro_use]
 extern crate rustc;

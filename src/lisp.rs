@@ -1,3 +1,5 @@
+#![allow(float_cmp)]
+
 use std;
 use rustc_front::hir::*;
 use syntax::ast::Lit_::*;
@@ -12,6 +14,13 @@ pub enum LispExpr {
     Ident(u64),
     Lit(f64),
     Unary(UnOp, Box<LispExpr>),
+}
+
+#[derive(Debug)]
+pub enum LispExprError {
+    UnknownType,
+    UnknownKind,
+    WrongFloat,
 }
 
 impl std::fmt::Debug for LispExpr {
@@ -82,21 +91,8 @@ impl LispExpr {
         }
 
         let mut ids = HashMap::new();
-        let r = form_of_impl(self, other, &mut ids);
-        //println!("{:?}\n{:?} → {}", self, other, r);
-        r
+        form_of_impl(self, other, &mut ids)
     }
-
-}
-
-#[derive(Debug)]
-pub enum LispExprError {
-    UnknownType,
-    UnknownKind,
-    WrongFloat,
-}
-
-impl LispExpr {
 
     pub fn from_expr(expr: &Expr) -> Result<LispExpr, LispExprError> {
         match expr.node {
@@ -205,7 +201,7 @@ impl Parser {
     fn parse_impl<It: Iterator<Item=char>>(&mut self, it: &mut It) -> Result<LispExpr, ParseError> {
         match self.get_char(it, true) {
             Some('(') => {
-                return match self.get_char(it, true) {
+                match self.get_char(it, true) {
                     Some('+') => self.parse_op(it, BinOp_::BiAdd),
                     Some('-') => self.parse_op(it, BinOp_::BiSub),
                     Some('*') => self.parse_op(it, BinOp_::BiMul),
