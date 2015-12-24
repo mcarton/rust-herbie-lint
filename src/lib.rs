@@ -1,18 +1,24 @@
+#![feature(box_syntax)]
 #![feature(plugin_registrar)]
 #![feature(rustc_private)]
 
+extern crate rusqlite;
 #[macro_use]
 extern crate rustc;
 #[macro_use]
 extern crate rustc_plugin;
 #[macro_use]
 extern crate rustc_front;
+extern crate syntax;
 
 use rustc_plugin::Registry;
 
 pub mod lint;
+mod lisp;
 
 #[plugin_registrar]
 pub fn plugin_registrar(reg: &mut Registry) {
-    reg.register_late_lint_pass(Box::new(lint::Herbie));
+    if let Ok(herbie) = lint::Herbie::new() {
+        reg.register_late_lint_pass(box herbie);
+    }
 }

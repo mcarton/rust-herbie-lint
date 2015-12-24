@@ -9,3 +9,4 @@ plugin = true
 
 [dependencies]
 compiletest_rs = "0.0.11"
+rusqlite = "0.6.0"
