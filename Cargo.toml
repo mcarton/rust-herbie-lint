@@ -1,0 +1,11 @@
+[package]
+name = "herbie-lint"
+version = "0.1.0"
+authors = ["mcarton <cartonmartin+git@gmail.com>"]
+
+[lib]
+name = "herbie_lint"
+plugin = true
+
+[dependencies]
+compiletest_rs = "0.0.11"
