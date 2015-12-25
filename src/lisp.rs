@@ -128,11 +128,13 @@ impl LispExpr {
                         }
                     }
                 },
+                ExprCall(..) | ExprCast(..) | ExprBlock(..) => {
+                    let id = *curr_id;
+                    *curr_id += 1;
+                    Ok(LispExpr::Ident(id))
+                },
                 // TODO:
-                // ExprCall,
                 // ExprMethodCall,
-                // ExprCast,
-                // ExprBlock,
                 // ExprAssignOp,
                 // ExprField,
                 // ExprTupField,
