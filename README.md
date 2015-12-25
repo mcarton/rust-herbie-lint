@@ -1,4 +1,4 @@
-# *Herbie* lint for Rust [![Build Status][travis-svg]][travis] [![Crates.io][crate-svg]][crate] [![License][license-svg]][license]
+# *Herbie* lint for Rust [![Build Status][travis-svg]][travis] [![Crates.io][crate-svg]][crate] [![License][license-svg]][license] [![Coverage][coverage-svg]][coverage]
 
 ## What
 
@@ -54,6 +54,8 @@ more and if you want more Rust lints.
 
 [clippy-usage]: https://github.com/Manishearth/rust-clippy#usage
 [clippy]: https://github.com/Manishearth/rust-clippy
+[coverage-svg]: https://coveralls.io/repos/mcarton/rust-herbie-lint/badge.svg?branch=master&service=github
+[coverage]: https://coveralls.io/github/mcarton/rust-herbie-lint/
 [crate-svg]: https://img.shields.io/crates/v/herbie-lint.svg
 [crate]: https://crates.io/crates/herbie-lint/
 [ghc-herbie-db]: https://github.com/mikeizbicki/HerbiePlugin/blob/master/data/Herbie.db?raw=true
