@@ -1,4 +1,4 @@
-#![allow(float_cmp)]
+#![cfg_attr(feature="clippy", allow(float_cmp))]
 
 use std;
 use rustc_front::hir::*;
