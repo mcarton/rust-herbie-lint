@@ -1,0 +1,9 @@
+language: rust
+rust:
+  - nightly
+
+before_script:
+    wget 'https://github.com/mikeizbicki/HerbiePlugin/blob/master/data/Herbie.db?raw=true' -O Herbie.db
+
+script:
+    cargo test --features=clippy
