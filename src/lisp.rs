@@ -320,12 +320,6 @@ impl Parser {
                     Some('-') => self.parse_op(it, BinOp_::BiSub),
                     Some('*') => self.parse_op(it, BinOp_::BiMul),
                     Some('/') => self.parse_op(it, BinOp_::BiDiv),
-                    Some(c) if c.is_digit(10) => {
-                        self.put_back(c);
-                        let r = self.parse_float(it);
-                        try!(self.expect(it, ')', true));
-                        r
-                    },
                     Some(c) => {
                         self.put_back(c);
                         self.parse_fun(it)
