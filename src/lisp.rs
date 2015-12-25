@@ -1,12 +1,13 @@
 #![cfg_attr(feature="clippy", allow(float_cmp))]
 
-use std;
 use rustc_front::hir::*;
-use syntax::ast::Lit_::*;
-use syntax::ast::{FloatTy, Name};
 use rustc_front::util::{binop_to_string, unop_to_string};
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
+use std;
+use syntax::ast::Lit_::*;
+use syntax::ast::{FloatTy, Name};
+use syntax::ptr::P;
 
 pub enum LispExpr {
     Binary(BinOp_, Box<LispExpr>, Box<LispExpr>),
@@ -14,13 +15,6 @@ pub enum LispExpr {
     Ident(u64),
     Lit(f64),
     Unary(UnOp, Box<LispExpr>),
-}
-
-#[derive(Debug)]
-pub enum LispExprError {
-    UnknownType,
-    UnknownKind,
-    WrongFloat,
 }
 
 impl std::fmt::Debug for LispExpr {
@@ -61,198 +55,156 @@ const KNOW_FUNS : &'static [(&'static str, &'static str, usize)] = &[
 
 impl LispExpr {
 
-    pub fn is_form_of(&self, other: &LispExpr) -> bool {
+    pub fn is_form_of(matchee: &Expr, other: &LispExpr) -> bool {
         enum Binded {
-            Ident(u64),
+            Field(Option<QSelf>, bool, HirVec<PathSegment>, Name),
+            Ident(Option<QSelf>, bool, P<[PathSegment]>),
             Lit(f64),
             Other,
+            TupField(Option<QSelf>, bool, HirVec<PathSegment>, usize),
         }
 
-        fn is_form_of_impl(lhs: &LispExpr, rhs: &LispExpr, ids: &mut HashMap<u64, Binded>) -> bool {
-            match (lhs, rhs) {
-                (&LispExpr::Binary(lop, ref lp1, ref lp2), &LispExpr::Binary(rop, ref rp1, ref rp2)) => {
-                    lop == rop && is_form_of_impl(lp1, rp1, ids) && is_form_of_impl(lp2, rp2, ids)
+        fn is_form_of_impl(lhs: &Expr, rhs: &LispExpr, ids: &mut HashMap<u64, Binded>) -> bool {
+            fn bind_unknown(rid: u64, ids: &mut HashMap<u64, Binded>) -> bool {
+                if let Entry::Vacant(vacant) = ids.entry(rid) {
+                    vacant.insert(Binded::Other);
+                    true
+                }
+                else {
+                    false
+                }
+            }
+
+            match (&lhs.node, rhs) {
+                (&ExprBinary(lop, ref lp1, ref lp2), &LispExpr::Binary(rop, ref rp1, ref rp2)) => {
+                    lop.node == rop
+                    && is_form_of_impl(lp1, rp1, ids)
+                    && is_form_of_impl(lp2, rp2, ids)
                 },
-                (&LispExpr::Fun(ref lfun, ref lp), &LispExpr::Fun(ref rfun, ref rp)) => {
-                    lfun == rfun && lp.len() == rp.len() && lp.iter().zip(rp).all(|(lp, rp)| is_form_of_impl(lp, rp, ids))
-                },
-                (&LispExpr::Ident(lid), &LispExpr::Ident(rid)) => {
-                    match ids.entry(rid) {
-                        Entry::Occupied(entry) => {
-                            if let Binded::Ident(binded) = *entry.get() {
-                                binded == lid
-                            }
-                            else {
-                                false
-                            }
-                        },
-                        Entry::Vacant(vacant) => {
-                            vacant.insert(Binded::Ident(lid));
-                            true
+                (&ExprMethodCall(ref lfun, ref ascripted_type, ref lp), &LispExpr::Fun(ref rfun, ref rp)) if ascripted_type.is_empty() => {
+                    let name = lfun.node.as_str();
+                    if let Some(&(herbie_name, _, _)) = KNOW_FUNS.iter().find(
+                        |&&(_, rust_name, num_params)| {
+                            rust_name == name && lp.len() == num_params
                         }
-                    }
-                },
-                (&LispExpr::Lit(l), &LispExpr::Lit(r)) => {
-                    l == r
-                },
-                (&LispExpr::Lit(l), &LispExpr::Ident(rid)) => {
-                    match ids.entry(rid) {
-                        Entry::Occupied(entry) => {
-                            if let Binded::Lit(binded) = *entry.get() {
-                                binded == l
-                            }
-                            else {
-                                false
-                            }
-                        },
-                        Entry::Vacant(vacant) => {
-                            vacant.insert(Binded::Lit(l));
-                            true
-                        }
-                    }
-                },
-                (&LispExpr::Unary(lop, ref lp), &LispExpr::Unary(rop, ref rp)) => {
-                    lop == rop && is_form_of_impl(lp, rp, ids)
-                },
-                (_, &LispExpr::Ident(rid)) => {
-                    if let Entry::Vacant(vacant) = ids.entry(rid){
-                        vacant.insert(Binded::Other);
-                        true
+                    ) {
+                        herbie_name == rfun
+                        && lp.iter().zip(rp).all(|(lp, rp)| is_form_of_impl(lp, rp, ids))
                     }
                     else {
                         false
                     }
+                },
+                (&ExprPath(ref qualif, ref path), &LispExpr::Ident(rid)) => {
+                    match ids.entry(rid) {
+                        Entry::Occupied(entry) => {
+                            if let Binded::Ident(ref bqualif, global, ref bpath) = *entry.get() {
+                                qualif == bqualif
+                                && path.global == global
+                                && &path.segments == bpath
+                            }
+                            else {
+                                false
+                            }
+                        },
+                        Entry::Vacant(vacant) => {
+                            vacant.insert(Binded::Ident(qualif.clone(), path.global, path.segments.clone()));
+                            true
+                        }
+                    }
+                },
+                (&ExprLit(ref lit), &LispExpr::Lit(r)) => {
+                    match lit.node {
+                        LitFloat(ref f, FloatTy::TyF64) | LitFloatUnsuffixed(ref f) => {
+                            f.parse() == Ok(r)
+                        },
+                        _ => false
+                    }
+                },
+                (&ExprLit(ref lit), &LispExpr::Ident(rid)) => {
+                    match lit.node {
+                        LitFloat(ref lit, FloatTy::TyF64) | LitFloatUnsuffixed(ref lit) => {
+                            if let Ok(lit) = lit.parse() {
+                                match ids.entry(rid) {
+                                    Entry::Occupied(entry) => {
+                                        if let Binded::Lit(binded) = *entry.get() {
+                                            lit == binded
+                                        }
+                                        else {
+                                            false
+                                        }
+                                    },
+                                    Entry::Vacant(vacant) => {
+                                        vacant.insert(Binded::Lit(lit));
+                                        true
+                                    }
+                                }
+                            }
+                            else {
+                                bind_unknown(rid, ids)
+                            }
+                        },
+                        _ => bind_unknown(rid, ids)
+                    }
+                },
+                (&ExprUnary(lop, ref lp), &LispExpr::Unary(rop, ref rp)) => {
+                    lop == rop && is_form_of_impl(lp, rp, ids)
+                },
+                (&ExprTupField(ref tup, ref idx), &LispExpr::Ident(rid)) => {
+                    if let ExprPath(ref qualif, ref path) = tup.node {
+                        return match ids.entry(rid) {
+                            Entry::Occupied(entry) => {
+                                if let Binded::TupField(ref bqualif, global, ref bpath, bidx) = *entry.get() {
+                                    qualif == bqualif
+                                    && path.global == global
+                                    && &path.segments == bpath
+                                    && idx.node == bidx
+                                }
+                                else {
+                                    false
+                                }
+                            },
+                            Entry::Vacant(vacant) => {
+                                vacant.insert(Binded::TupField(qualif.clone(), path.global, path.segments.clone(), idx.node));
+                                true
+                            }
+                        }
+                    }
+
+                    bind_unknown(rid, ids)
+                },
+                (&ExprField(ref expr, ref name), &LispExpr::Ident(rid)) => {
+                    if let ExprPath(ref qualif, ref path) = expr.node {
+                        return match ids.entry(rid) {
+                            Entry::Occupied(entry) => {
+                                if let Binded::Field(ref bqualif, global, ref bpath, ref bname) = *entry.get() {
+                                    qualif == bqualif
+                                    && path.global == global
+                                    && &path.segments == bpath
+                                    && &name.node == bname
+                                }
+                                else {
+                                    false
+                                }
+                            },
+                            Entry::Vacant(vacant) => {
+                                vacant.insert(Binded::Field(qualif.clone(), path.global, path.segments.clone(), name.node));
+                                true
+                            }
+                        }
+                    }
+
+                    bind_unknown(rid, ids)
+                },
+                (_, &LispExpr::Ident(rid)) => {
+                    bind_unknown(rid, ids)
                 },
                 _ => false,
             }
         }
 
         let mut ids = HashMap::new();
-        is_form_of_impl(self, other, &mut ids)
-    }
-
-    pub fn from_expr(expr: &Expr) -> Result<LispExpr, LispExprError> {
-        #[derive(PartialEq, Eq, Hash)]
-        enum Binded {
-            Field(Option<QSelf>, bool, HirVec<PathSegment>, Name),
-            Path(Option<QSelf>, bool, HirVec<PathSegment>),
-            TupField(Option<QSelf>, bool, HirVec<PathSegment>, usize),
-        }
-
-        fn from_expr_impl(expr: &Expr, curr_id: &mut u64, ids: &mut HashMap<Binded, u64>) -> Result<LispExpr, LispExprError> {
-            let unknown = |curr_id: &mut u64| {
-                let id = *curr_id;
-                *curr_id += 1;
-                Ok(LispExpr::Ident(id))
-            };
-
-            match expr.node {
-                ExprBinary(op, ref lhs, ref rhs) => {
-                    Ok(LispExpr::Binary(op.node, box try!(from_expr_impl(lhs, curr_id, ids)), box try!(from_expr_impl(rhs, curr_id, ids))))
-                },
-                ExprLit(ref lit) => {
-                    match lit.node {
-                        LitFloat(ref f, FloatTy::TyF64) => LispExpr::from_lit_float(&f),
-                        LitFloatUnsuffixed(ref f) => LispExpr::from_lit_float(&f),
-                        _ => Err(LispExprError::UnknownType)
-                    }
-                },
-                ExprUnary(op, ref expr) => {
-                    Ok(LispExpr::Unary(op, box try!(from_expr_impl(&expr, curr_id, ids))))
-                },
-                ExprPath(ref qualif, ref path) => {
-                    match ids.entry(Binded::Path(qualif.clone(), path.global, path.segments.clone())) {
-                        Entry::Occupied(entry) => {
-                            Ok(LispExpr::Ident(*entry.get()))
-                        },
-                        Entry::Vacant(vacant) => {
-                            let id = *curr_id;
-                            *curr_id += 1;
-                            vacant.insert(id);
-                            Ok(LispExpr::Ident(id))
-                        }
-                    }
-                },
-                ExprCall(..) | ExprCast(..) | ExprBlock(..) => {
-                    unknown(curr_id)
-                },
-                ExprMethodCall(ref name, ref ascripted_type, ref params) => {
-                    if ascripted_type.is_empty() {
-                        let name = name.node.as_str();
-
-                        if let Some(&(herbie_name, _, _)) = KNOW_FUNS.iter().find(
-                            |&&(_, rust_name, num_params)| {
-                                rust_name == name && params.len() == num_params
-                            }
-                        ) {
-                            let mut conv_params = vec![];
-                            for p in params {
-                                let p = from_expr_impl(p, curr_id, ids);
-                                if let Ok(p) = p {
-                                    conv_params.push(p);
-                                }
-                                else {
-                                    return p;
-                                }
-                            }
-                            return Ok(LispExpr::Fun(herbie_name.into(), conv_params))
-                        }
-                    }
-
-                    unknown(curr_id)
-                },
-                ExprTupField(ref tup, idx) => {
-                    if let ExprPath(ref qualif, ref path) = tup.node {
-                        return match ids.entry(Binded::TupField(qualif.clone(), path.global, path.segments.clone(), idx.node)) {
-                            Entry::Occupied(entry) => {
-                                Ok(LispExpr::Ident(*entry.get()))
-                            },
-                            Entry::Vacant(vacant) => {
-                                let id = *curr_id;
-                                *curr_id += 1;
-                                vacant.insert(id);
-                                Ok(LispExpr::Ident(id))
-                            }
-                        }
-                    }
-
-                    unknown(curr_id)
-                },
-                ExprField(ref expr, ref name) => {
-                    if let ExprPath(ref qualif, ref path) = expr.node {
-                        return match ids.entry(Binded::Field(qualif.clone(), path.global, path.segments.clone(), name.node)) {
-                            Entry::Occupied(entry) => {
-                                Ok(LispExpr::Ident(*entry.get()))
-                            },
-                            Entry::Vacant(vacant) => {
-                                let id = *curr_id;
-                                *curr_id += 1;
-                                vacant.insert(id);
-                                Ok(LispExpr::Ident(id))
-                            }
-                        }
-                    }
-
-                    unknown(curr_id)
-                },
-                // TODO:
-                // ExprAssignOp,
-                // ExprIndex,
-                _ => Err(LispExprError::UnknownKind)
-            }
-        }
-
-        let mut ids = HashMap::new();
-        from_expr_impl(expr, &mut 0, &mut ids)
-    }
-
-    fn from_lit_float(f: &str) -> Result<LispExpr, LispExprError> {
-        if let Ok(f) = f.parse() {
-            Ok(LispExpr::Lit(f))
-        }
-        else {
-            Err(LispExprError::WrongFloat)
-        }
+        is_form_of_impl(matchee, other, &mut ids)
     }
 
     // TODO: should probably not be pub
