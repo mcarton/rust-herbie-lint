@@ -60,8 +60,7 @@ impl LateLintPass for Herbie {
         if let Ok(lisp) = LispExpr::from_expr(expr) {
             if let Some(&(_, ref cmdout)) = self.subs.iter().find(|&&(ref cmdin, _)| lisp.is_form_of(cmdin)) {
                 cx.span_lint(HERBIE, expr.span, "Numerically unstable expression");
-                // TODO: rustify
-                cx.sess().span_suggestion(expr.span, "Try this", cmdout.to_lisp());
+                cx.sess().span_suggestion(expr.span, "Try this", format!("{} ↔ {}", cmdout.to_lisp(), cmdout.to_rust()));
             }
         }
     }

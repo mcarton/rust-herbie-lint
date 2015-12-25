@@ -273,7 +273,7 @@ impl LispExpr {
 
                 buf.push(')');
                 buf
-            }
+            },
             LispExpr::Lit(f) => {
                 format!("{}", f)
             },
@@ -282,7 +282,41 @@ impl LispExpr {
             },
             LispExpr::Ident(id) => {
                 format!("${}", id)
-            }
+            },
+        }
+    }
+
+    pub fn to_rust(&self) -> String {
+        match *self {
+            LispExpr::Binary(op, ref lhs, ref rhs) => {
+                format!("({}) {} ({})", lhs.to_rust(), binop_to_string(op), rhs.to_rust())
+            },
+            LispExpr::Fun(ref name, ref params) => {
+                let mut buf = String::new();
+                buf.push_str(&params[0].to_rust());
+                buf.push('.');
+                buf.push_str(name);
+                buf.push('(');
+
+                for (i, p) in params.iter().skip(1).enumerate() {
+                    if i != 0 {
+                        buf.push_str(", ");
+                    }
+                    buf.push_str(&p.to_rust());
+                }
+
+                buf.push(')');
+                buf
+            },
+            LispExpr::Lit(f) => {
+                format!("{}", f)
+            },
+            LispExpr::Unary(op, ref expr) => {
+                format!("{}{}", unop_to_string(op), expr.to_rust())
+            },
+            LispExpr::Ident(id) => {
+                format!("${}", id)
+            },
         }
     }
 
