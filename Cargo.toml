@@ -1,7 +1,11 @@
 [package]
-name = "herbie-lint"
-version = "0.1.0"
 authors = ["mcarton <cartonmartin+git@gmail.com>"]
+description = "A rustc plugin to check for numerical instability"
+keywords = ["float", "herbie", "lint", "math", "plugin"]
+license = "MPL-2.0"
+name = "herbie-lint"
+repository = "https://github.com/mcarton/rust-herbie-lint"
+version = "0.1.0"
 
 [lib]
 name = "herbie_lint"
