@@ -4,6 +4,7 @@ description = "A rustc plugin to check for numerical instability"
 keywords = ["float", "herbie", "lint", "math", "plugin"]
 license = "MPL-2.0"
 name = "herbie-lint"
+readme = "README.md"
 repository = "https://github.com/mcarton/rust-herbie-lint"
 version = "0.1.0"
 
