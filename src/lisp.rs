@@ -33,20 +33,20 @@ impl std::fmt::Debug for LispExpr {
 
 impl LispExpr {
 
-    pub fn form_of(&self, other: &LispExpr) -> bool {
+    pub fn is_form_of(&self, other: &LispExpr) -> bool {
         #[derive(PartialEq)]
         enum Binded {
             Ident(u64),
             Lit(f64),
         }
 
-        fn form_of_impl(lhs: &LispExpr, rhs: &LispExpr, ids: &mut HashMap<u64, Binded>) -> bool {
+        fn is_form_of_impl(lhs: &LispExpr, rhs: &LispExpr, ids: &mut HashMap<u64, Binded>) -> bool {
             match (lhs, rhs) {
                 (&LispExpr::Binary(lop, ref lp1, ref lp2), &LispExpr::Binary(rop, ref rp1, ref rp2)) => {
-                    lop == rop && form_of_impl(lp1, rp1, ids) && form_of_impl(lp2, rp2, ids)
+                    lop == rop && is_form_of_impl(lp1, rp1, ids) && is_form_of_impl(lp2, rp2, ids)
                 },
                 (&LispExpr::Fun(ref lfun, ref lp), &LispExpr::Fun(ref rfun, ref rp)) => {
-                    lfun == rfun && lp.len() == rp.len() && lp.iter().zip(rp).all(|(lp, rp)| form_of_impl(lp, rp, ids))
+                    lfun == rfun && lp.len() == rp.len() && lp.iter().zip(rp).all(|(lp, rp)| is_form_of_impl(lp, rp, ids))
                 },
                 (&LispExpr::Ident(lid), &LispExpr::Ident(rid)) => {
                     match ids.entry(rid) {
@@ -84,43 +84,65 @@ impl LispExpr {
                     }
                 },
                 (&LispExpr::Unary(lop, ref lp), &LispExpr::Unary(rop, ref rp)) => {
-                    lop == rop && form_of_impl(lp, rp, ids)
+                    lop == rop && is_form_of_impl(lp, rp, ids)
                 },
                 _ => false,
             }
         }
 
         let mut ids = HashMap::new();
-        form_of_impl(self, other, &mut ids)
+        is_form_of_impl(self, other, &mut ids)
     }
 
     pub fn from_expr(expr: &Expr) -> Result<LispExpr, LispExprError> {
-        match expr.node {
-            ExprBinary(op, ref lhs, ref rhs) => {
-                Ok(LispExpr::Binary(op.node, box try!(Self::from_expr(lhs)), box try!(Self::from_expr(rhs))))
-            },
-            ExprLit(ref lit) => {
-                match lit.node {
-                    LitFloat(ref f, FloatTy::TyF64) => Self::from_lit_float(&f),
-                    LitFloatUnsuffixed(ref f) => Self::from_lit_float(&f),
-                    _ => Err(LispExprError::UnknownType)
-                }
-            },
-            ExprUnary(op, ref expr) => {
-                Ok(LispExpr::Unary(op, box try!(Self::from_expr(&expr))))
-            },
-            // TODO:
-            // ExprCall,
-            // ExprMethodCall,
-            // ExprCast,
-            // ExprBlock,
-            // ExprAssignOp,
-            // ExprField,
-            // ExprTupField,
-            // ExprIndex,
-            // ExprPath,
-            _ => Err(LispExprError::UnknownKind)
+        #[derive(PartialEq, Eq, Hash)]
+        enum Binded {
+            Path(Option<QSelf>, bool, HirVec<PathSegment>),
         }
+
+        fn from_expr_impl(expr: &Expr, curr_id: &mut u64, ids: &mut HashMap<Binded, u64>) -> Result<LispExpr, LispExprError> {
+            match expr.node {
+                ExprBinary(op, ref lhs, ref rhs) => {
+                    Ok(LispExpr::Binary(op.node, box try!(from_expr_impl(lhs, curr_id, ids)), box try!(from_expr_impl(rhs, curr_id, ids))))
+                },
+                ExprLit(ref lit) => {
+                    match lit.node {
+                        LitFloat(ref f, FloatTy::TyF64) => LispExpr::from_lit_float(&f),
+                        LitFloatUnsuffixed(ref f) => LispExpr::from_lit_float(&f),
+                        _ => Err(LispExprError::UnknownType)
+                    }
+                },
+                ExprUnary(op, ref expr) => {
+                    Ok(LispExpr::Unary(op, box try!(from_expr_impl(&expr, curr_id, ids))))
+                },
+                ExprPath(ref qualif, ref path) => {
+                    match ids.entry(Binded::Path(qualif.clone(), path.global, path.segments.clone())) {
+                        Entry::Occupied(entry) => {
+                            Ok(LispExpr::Ident(*entry.get()))
+                        },
+                        Entry::Vacant(vacant) => {
+                            let id = *curr_id;
+                            *curr_id += 1;
+                            vacant.insert(id);
+                            Ok(LispExpr::Ident(id))
+                        }
+                    }
+                },
+                // TODO:
+                // ExprCall,
+                // ExprMethodCall,
+                // ExprCast,
+                // ExprBlock,
+                // ExprAssignOp,
+                // ExprField,
+                // ExprTupField,
+                // ExprIndex,
+                _ => Err(LispExprError::UnknownKind)
+            }
+        }
+
+        let mut ids = HashMap::new();
+        from_expr_impl(expr, &mut 0, &mut ids)
     }
 
     fn from_lit_float(f: &str) -> Result<LispExpr, LispExprError> {

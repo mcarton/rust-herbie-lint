@@ -25,7 +25,7 @@ impl Herbie {
                             Ok(cmdin) => {
                                 match lisp::parse(&cmdout) {
                                     Ok(cmdout) => {
-                                        if !cmdin.form_of(&cmdout) {
+                                        if !cmdin.is_form_of(&cmdout) {
                                             Some((cmdin, cmdout))
                                         }
                                         else {
@@ -58,7 +58,7 @@ impl LintPass for Herbie {
 impl LateLintPass for Herbie {
     fn check_expr(&mut self, cx: &LateContext, expr: &Expr) {
         if let Ok(lisp) = LispExpr::from_expr(expr) {
-            if let Some(&(_, ref cmdout)) = self.subs.iter().find(|&&(ref cmdin, _)| lisp.form_of(cmdin)) {
+            if let Some(&(_, ref cmdout)) = self.subs.iter().find(|&&(ref cmdin, _)| lisp.is_form_of(cmdin)) {
                 cx.span_lint(HERBIE, expr.span, "Numerically unstable expression");
                 // TODO: rustify
                 cx.sess().span_suggestion(expr.span, "Try this", cmdout.to_lisp());

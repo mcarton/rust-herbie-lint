@@ -6,8 +6,10 @@
 fn main() {
     let (a, b, c) = (0., 0., 0.);
     (a/a + a) * a; //~ERROR
-    (a/b + a) * a; //~ERROR
-    (a/b + c) * a; //~ERROR
+    (a/b + a) * b; //~ERROR
+    (a/b + c) * b; //~ERROR
+
+    (a/b + c) * a;
 
     (0./1. + 2.) * 1.; //~ERROR
     (1./1. + 2.) * 1.; //~ERROR
