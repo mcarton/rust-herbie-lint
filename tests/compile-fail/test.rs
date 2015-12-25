@@ -3,11 +3,22 @@
 
 #![deny(herbie)]
 
-fn foo() -> f64 {
+fn get_f64() -> f64 {
     4.2
 }
 
+fn get_tup() -> (f64, f64) {
+    (0., 0.)
+}
+
+fn integers() {
+    1;
+    (1/2 + 3) * 2;
+}
+
 fn main() {
+    integers();
+
     let (a, b, c) = (0., 0., 0.);
     (a/a + a) * a;
     //~^ ERROR
@@ -46,7 +57,11 @@ fn main() {
     //~| HELP Try this
     //~| SUGGESTION (+ (* $2 $1) $0)
 
-    (a/b + foo()) * b;
+    (a/b + get_f64()) * b;
+    //~^ ERROR
+    //~| HELP Try this
+    //~| SUGGESTION (+ (* $2 $1) $0)
+    (a/b + (4.5f64).sqrt()) * b;
     //~^ ERROR
     //~| HELP Try this
     //~| SUGGESTION (+ (* $2 $1) $0)
@@ -59,7 +74,7 @@ fn main() {
     //~| HELP Try this
     //~| SUGGESTION (+ (* $2 $1) $0)
 
-    (a/foo() + c) * foo();
+    (a/get_f64() + c) * get_f64();
     (a/{ 42. } + c) * { 42. };
 
     (4.5f64).abs();
@@ -88,12 +103,18 @@ fn main() {
     //~| HELP Try this
     //~| SUGGESTION (+ (* $2 $1) $0)
 
+    (a/b + get_tup().0) * b;
+    //~^ ERROR
+    //~| HELP Try this
+    //~| SUGGESTION (+ (* $2 $1) $0)
+
     (a/d.0 + c) * d.0;
     //~^ ERROR
     //~| HELP Try this
     //~| SUGGESTION (+ (* $2 $1) $0)
 
     (a/d.0 + c) * d.1;
+    (a/get_tup().0 + c) * get_tup().0;
 
     struct Foo { a: f64, b: f64 };
     let e = Foo { a: 0., b: 0. };

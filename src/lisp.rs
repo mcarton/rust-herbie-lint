@@ -62,10 +62,10 @@ const KNOW_FUNS : &'static [(&'static str, &'static str, usize)] = &[
 impl LispExpr {
 
     pub fn is_form_of(&self, other: &LispExpr) -> bool {
-        #[derive(PartialEq)]
         enum Binded {
             Ident(u64),
             Lit(f64),
+            Other,
         }
 
         fn is_form_of_impl(lhs: &LispExpr, rhs: &LispExpr, ids: &mut HashMap<u64, Binded>) -> bool {
@@ -113,6 +113,15 @@ impl LispExpr {
                 },
                 (&LispExpr::Unary(lop, ref lp), &LispExpr::Unary(rop, ref rp)) => {
                     lop == rop && is_form_of_impl(lp, rp, ids)
+                },
+                (_, &LispExpr::Ident(rid)) => {
+                    if let Entry::Vacant(vacant) = ids.entry(rid){
+                        vacant.insert(Binded::Other);
+                        true
+                    }
+                    else {
+                        false
+                    }
                 },
                 _ => false,
             }
