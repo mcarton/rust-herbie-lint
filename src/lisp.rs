@@ -31,6 +31,34 @@ impl std::fmt::Debug for LispExpr {
 
 }
 
+/// List (herbie_name, rust_name).
+/// Warning: *MUST* be alphabetized on Herbie name.
+/// Herbie also supports the following:
+///   * cot (cotangent),
+///   * expt (expi, expf),
+///   * mod
+///   * sqt (square),
+const KNOW_FUNS : &'static [(&'static str, &'static str, usize)] = &[
+    ("abs",   "abs",    1),
+    ("acos",  "acos",   1),
+    ("asin",  "asin",   1),
+    ("atan",  "atan",   1),
+    ("atan2", "atan2",  2),
+    ("cos",   "cos",    1),
+    ("cosh",  "cosh",   1),
+    ("exp",   "exp",    1),
+    ("expm1", "exp_m1", 1),
+    ("hypot", "hypot",  2),
+    ("log",   "ln",     1),
+    ("log1p", "ln_1p",  1),
+    ("sin",   "sin",    1),
+    ("sinh",  "sinh",   1),
+    ("sqrt",  "sqrt",   1),
+    ("tan",   "tan",    1),
+    ("tanh",  "tanh",   1),
+];
+
+
 impl LispExpr {
 
     pub fn is_form_of(&self, other: &LispExpr) -> bool {
@@ -133,8 +161,34 @@ impl LispExpr {
                     *curr_id += 1;
                     Ok(LispExpr::Ident(id))
                 },
+                ExprMethodCall(ref name, ref ascripted_type, ref params) => {
+                    if ascripted_type.is_empty() {
+                        let name = name.node.as_str();
+
+                        if let Some(&(herbie_name, _, _)) = KNOW_FUNS.iter().find(
+                            |&&(_, rust_name, num_params)| {
+                                rust_name == name && params.len() == num_params
+                            }
+                        ) {
+                            let mut conv_params = vec![];
+                            for p in params {
+                                let p = from_expr_impl(p, curr_id, ids);
+                                if let Ok(p) = p {
+                                    conv_params.push(p);
+                                }
+                                else {
+                                    return p;
+                                }
+                            }
+                            return Ok(LispExpr::Fun(herbie_name.into(), conv_params))
+                        }
+                    }
+
+                    let id = *curr_id;
+                    *curr_id += 1;
+                    Ok(LispExpr::Ident(id))
+                },
                 // TODO:
-                // ExprMethodCall,
                 // ExprAssignOp,
                 // ExprField,
                 // ExprTupField,
@@ -288,6 +342,7 @@ impl Parser {
     }
 
     fn parse_ident<It: Iterator<Item=char>>(&mut self, it: &mut It) -> Result<LispExpr, ParseError> {
+        // TODO: Herbie also supports ‘pi’ and ‘e’ as native constants.
         let mut buf = String::new();
         loop {
             let c = self.get_char(it, false);
@@ -346,6 +401,8 @@ impl Parser {
     }
 
     fn parse_op<It: Iterator<Item=char>>(&mut self, it: &mut It, op: BinOp_) -> Result<LispExpr, ParseError> {
+        // TODO: Herbie seems to also support the following for the repip of a float: (/ 42) and
+        // rust has a function recip for that
         let lhs = try!(self.parse_impl(it));
         let r = if let Ok(rhs) = self.parse_impl(it) {
             Ok(LispExpr::Binary(op, box lhs, box rhs))
