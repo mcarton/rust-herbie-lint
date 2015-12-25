@@ -80,4 +80,33 @@ fn main() {
     //~^ ERROR
     //~| HELP Try this
     //~| SUGGESTION (+ (* $2 $1) $0)
+
+    let d = (0., 0.);
+
+    (a/b + d.0) * b;
+    //~^ ERROR
+    //~| HELP Try this
+    //~| SUGGESTION (+ (* $2 $1) $0)
+
+    (a/d.0 + c) * d.0;
+    //~^ ERROR
+    //~| HELP Try this
+    //~| SUGGESTION (+ (* $2 $1) $0)
+
+    (a/d.0 + c) * d.1;
+
+    struct Foo { a: f64, b: f64 };
+    let e = Foo { a: 0., b: 0. };
+
+    (a/b + e.a) * b;
+    //~^ ERROR
+    //~| HELP Try this
+    //~| SUGGESTION (+ (* $2 $1) $0)
+
+    (a/e.a + c) * e.a;
+    //~^ ERROR
+    //~| HELP Try this
+    //~| SUGGESTION (+ (* $2 $1) $0)
+
+    (a/e.a + c) * e.b;
 }

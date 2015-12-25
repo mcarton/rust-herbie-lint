@@ -3,7 +3,7 @@
 use std;
 use rustc_front::hir::*;
 use syntax::ast::Lit_::*;
-use syntax::ast::FloatTy;
+use syntax::ast::{FloatTy, Name};
 use rustc_front::util::{binop_to_string, unop_to_string};
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
@@ -125,10 +125,18 @@ impl LispExpr {
     pub fn from_expr(expr: &Expr) -> Result<LispExpr, LispExprError> {
         #[derive(PartialEq, Eq, Hash)]
         enum Binded {
+            Field(Option<QSelf>, bool, HirVec<PathSegment>, Name),
             Path(Option<QSelf>, bool, HirVec<PathSegment>),
+            TupField(Option<QSelf>, bool, HirVec<PathSegment>, usize),
         }
 
         fn from_expr_impl(expr: &Expr, curr_id: &mut u64, ids: &mut HashMap<Binded, u64>) -> Result<LispExpr, LispExprError> {
+            let unknown = |curr_id: &mut u64| {
+                let id = *curr_id;
+                *curr_id += 1;
+                Ok(LispExpr::Ident(id))
+            };
+
             match expr.node {
                 ExprBinary(op, ref lhs, ref rhs) => {
                     Ok(LispExpr::Binary(op.node, box try!(from_expr_impl(lhs, curr_id, ids)), box try!(from_expr_impl(rhs, curr_id, ids))))
@@ -157,9 +165,7 @@ impl LispExpr {
                     }
                 },
                 ExprCall(..) | ExprCast(..) | ExprBlock(..) => {
-                    let id = *curr_id;
-                    *curr_id += 1;
-                    Ok(LispExpr::Ident(id))
+                    unknown(curr_id)
                 },
                 ExprMethodCall(ref name, ref ascripted_type, ref params) => {
                     if ascripted_type.is_empty() {
@@ -184,14 +190,44 @@ impl LispExpr {
                         }
                     }
 
-                    let id = *curr_id;
-                    *curr_id += 1;
-                    Ok(LispExpr::Ident(id))
+                    unknown(curr_id)
+                },
+                ExprTupField(ref tup, idx) => {
+                    if let ExprPath(ref qualif, ref path) = tup.node {
+                        return match ids.entry(Binded::TupField(qualif.clone(), path.global, path.segments.clone(), idx.node)) {
+                            Entry::Occupied(entry) => {
+                                Ok(LispExpr::Ident(*entry.get()))
+                            },
+                            Entry::Vacant(vacant) => {
+                                let id = *curr_id;
+                                *curr_id += 1;
+                                vacant.insert(id);
+                                Ok(LispExpr::Ident(id))
+                            }
+                        }
+                    }
+
+                    unknown(curr_id)
+                },
+                ExprField(ref expr, ref name) => {
+                    if let ExprPath(ref qualif, ref path) = expr.node {
+                        return match ids.entry(Binded::Field(qualif.clone(), path.global, path.segments.clone(), name.node)) {
+                            Entry::Occupied(entry) => {
+                                Ok(LispExpr::Ident(*entry.get()))
+                            },
+                            Entry::Vacant(vacant) => {
+                                let id = *curr_id;
+                                *curr_id += 1;
+                                vacant.insert(id);
+                                Ok(LispExpr::Ident(id))
+                            }
+                        }
+                    }
+
+                    unknown(curr_id)
                 },
                 // TODO:
                 // ExprAssignOp,
-                // ExprField,
-                // ExprTupField,
                 // ExprIndex,
                 _ => Err(LispExprError::UnknownKind)
             }
