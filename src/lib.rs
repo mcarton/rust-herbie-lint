@@ -22,7 +22,5 @@ mod utils;
 
 #[plugin_registrar]
 pub fn plugin_registrar(reg: &mut Registry) {
-    if let Ok(herbie) = lint::Herbie::new() {
-        reg.register_late_lint_pass(box herbie);
-    }
+    reg.register_late_lint_pass(box lint::Herbie::new());
 }
