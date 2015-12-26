@@ -21,6 +21,7 @@ script:
 after_success: |
     pip install 'travis-cargo<0.2' --user &&
     export PATH=$HOME/.local/bin:$PATH &&
+    export LD_LIBRARY_PATH=target/debug/:$LD_LIBRARY_PATH &&
     travis-cargo coveralls --no-sudo --verify
 
 env:
