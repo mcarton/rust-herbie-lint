@@ -7,25 +7,25 @@ instable expression.
 
 Quick example of what you can get when compiling `test/compile-fail/test.rs`:
 ```rust
-test.rs:20:5: 20:18 warning: Numerically unstable expression, #[warn(herbie)] on by default
-test.rs:20     (a/b + c) * b;
+test.rs:40:5: 40:18 warning: Numerically unstable expression, #[warn(herbie)] on by default
+test.rs:40     (a/b + c) * b;
                ^~~~~~~~~~~~~
-test.rs:20:5: 20:18 help: Try this
-test.rs:       (+ (* $2 $1) $0);
+test.rs:40:5: 40:18 help: Try this
+test.rs:       (c * b) + a;
 test.rs:67:5: 67:23 warning: Numerically unstable expression, #[warn(herbie)] on by default
 test.rs:67     (a*a + b*b).sqrt();
                ^~~~~~~~~~~~~~~~~~
 test.rs:67:5: 67:23 help: Try this
-test.rs:       (hypot $0 $1);
+test.rs:       a.hypot(b);
 test.rs:79:5: 79:26 warning: Numerically unstable expression, #[warn(herbie)] on by default
 test.rs:79     (a/b + c.floor()) * b;
                ^~~~~~~~~~~~~~~~~~~~~
 test.rs:79:5: 79:26 help: Try this
-test.rs:       (+ (* $2 $1) $0);
+test.rs:       ((c.floor()) * b) + a;
 ```
 
 As you can see, it will report numerically instable expressions, and suggest a
-more stable correction (in *lisp* form for now).
+(sometimes over-parenthised) more stable correction.
 
 ## Usage
 This is a `rustc` plugin, to use it, you need a *nightly* Rust.
