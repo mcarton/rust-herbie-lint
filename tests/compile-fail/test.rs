@@ -3,12 +3,18 @@
 
 #![deny(herbie)]
 
+struct Foo { a: f64, b: f64 }
+
 fn get_f64() -> f64 {
     4.2
 }
 
 fn get_tup() -> (f64, f64) {
     (0., 0.)
+}
+
+fn get_struct() -> Foo {
+    Foo { a: 0., b: 0. }
 }
 
 fn integers() {
@@ -121,10 +127,14 @@ fn main() {
     (a/d.0 + c) * d.1;
     (a/get_tup().0 + c) * get_tup().0;
 
-    struct Foo { a: f64, b: f64 };
-    let e = Foo { a: 0., b: 0. };
+    let e = get_struct();
 
     (a/b + e.a) * b;
+    //~^ ERROR
+    //~| HELP Try this
+    //~| SUGGESTION (+ (* $2 $1) $0)
+
+    (a/b + get_struct().a) * b;
     //~^ ERROR
     //~| HELP Try this
     //~| SUGGESTION (+ (* $2 $1) $0)
@@ -134,5 +144,6 @@ fn main() {
     //~| HELP Try this
     //~| SUGGESTION (+ (* $2 $1) $0)
 
+    (a/get_struct().a + c) * get_struct().a;
     (a/e.a + c) * e.b;
 }
