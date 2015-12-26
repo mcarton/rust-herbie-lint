@@ -17,7 +17,7 @@ extern crate syntax;
 use rustc_plugin::Registry;
 
 pub mod lint;
-mod lisp;
+pub mod lisp;
 mod utils;
 
 #[plugin_registrar]

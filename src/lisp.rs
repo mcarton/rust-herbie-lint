@@ -11,7 +11,7 @@ use syntax::ast::{FloatTy, Name};
 use syntax::codemap::{Span, Spanned};
 use utils::{merge_span, snippet};
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum LispExpr {
     Binary(BinOp_, Box<LispExpr>, Box<LispExpr>),
     Fun(String, Vec<LispExpr>),
@@ -323,7 +323,7 @@ impl LispExpr {
 
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum ParseError {
     Arity,
     Expected(char),
@@ -333,28 +333,35 @@ pub enum ParseError {
     EOE,
 }
 
-struct Parser {
+pub struct Parser {
+    ids: Vec<String>,
     stack: Vec<char>,
 }
 
-pub fn parse(s: &str) -> Result<LispExpr, ParseError> {
-    let mut parser = Parser { stack: Vec::new() };
-    let mut it = s.chars();
-
-    match parser.parse_impl(&mut it) {
-        Ok(result) => {
-            if it.next().is_some() {
-                Err(ParseError::EOE)
-            }
-            else  {
-                Ok(result)
-            }
-        },
-        err @ Err(..) => err,
-    }
-}
-
 impl Parser {
+
+    pub fn new() -> Parser {
+        Parser {
+            ids: Vec::new(),
+            stack: Vec::new(),
+        }
+    }
+
+    pub fn parse(&mut self, s: &str) -> Result<LispExpr, ParseError> {
+        let mut it = s.chars();
+
+        match self.parse_impl(&mut it) {
+            Ok(result) => {
+                if it.next().is_some() {
+                    Err(ParseError::EOE)
+                }
+                else  {
+                    Ok(result)
+                }
+            },
+            err @ Err(..) => err,
+        }
+    }
 
     fn parse_impl<It: Iterator<Item=char>>(&mut self, it: &mut It) -> Result<LispExpr, ParseError> {
         match self.get_char(it, true) {
@@ -375,7 +382,10 @@ impl Parser {
                 self.put_back(c);
                 self.parse_float(it)
             },
-            Some('h') => self.parse_ident(it),
+            Some(c) if c.is_alphanumeric() => {
+                self.put_back(c);
+                self.parse_ident(it)
+            }
             Some(c) => {
                 self.put_back(c);
                 Err(ParseError::Unexpected(c))
@@ -421,10 +431,7 @@ impl Parser {
         loop {
             let c = self.get_char(it, false);
             if let Some(c) = c {
-                if buf.is_empty() && 'a' <= c && c <= 'z' {
-                    continue;
-                }
-                else if c.is_digit(10)  {
+                if c.is_alphanumeric()  {
                     buf.push(c);
                     continue;
                 }
@@ -436,9 +443,12 @@ impl Parser {
             break;
         }
 
-        match buf.parse() {
-            Ok(id) => Ok(LispExpr::Ident(id)),
-            Err(..) => Err(ParseError::Ident),
+        if let Some(id) = self.ids.iter().position(|e| e == &buf) {
+            Ok(LispExpr::Ident(id as u64))
+        }
+        else {
+            self.ids.push(buf);
+            Ok(LispExpr::Ident(self.ids.len() as u64 -1))
         }
     }
 
@@ -468,8 +478,11 @@ impl Parser {
 
             try!(self.expect(it, ')', true));
             if let Ok(idx) = KNOW_FUNS.binary_search_by(|p| p.0.cmp(&buf)) {
-                if KNOW_FUNS[idx].2 == params.len() {
-                    return Ok(LispExpr::Fun(buf, params))
+                return if KNOW_FUNS[idx].2 == params.len() {
+                    Ok(LispExpr::Fun(buf, params))
+                }
+                else {
+                    Err(ParseError::Arity)
                 }
             }
             else if buf == "sqr" && params.len() == 1 {

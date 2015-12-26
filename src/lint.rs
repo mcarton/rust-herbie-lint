@@ -29,9 +29,10 @@ impl Herbie {
                             return None;
                         }
 
-                        match lisp::parse(&cmdin) {
+                        let mut parser = lisp::Parser::new();
+                        match parser.parse(&cmdin) {
                             Ok(cmdin) => {
-                                match lisp::parse(&cmdout) {
+                                match parser.parse(&cmdout) {
                                     Ok(cmdout) => {
                                         Some((cmdin, cmdout))
                                     }
