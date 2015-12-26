@@ -17,11 +17,11 @@ test.rs:67     (a*a + b*b).sqrt();
                ^~~~~~~~~~~~~~~~~~
 test.rs:67:5: 67:23 help: Try this
 test.rs:       a.hypot(b);
-test.rs:79:5: 79:26 warning: Numerically unstable expression, #[warn(herbie)] on by default
-test.rs:79     (a/b + c.floor()) * b;
-               ^~~~~~~~~~~~~~~~~~~~~
-test.rs:79:5: 79:26 help: Try this
-test.rs:       ((c.floor()) * b) + a;
+test.rs:155:5: 155:30 warning: Numerically unstable expression, #[warn(herbie)] on by default
+test.rs:155     (a+b).sin() - (a+b).cos();
+                ^~~~~~~~~~~~~~~~~~~~~~~~~
+test.rs:155:5: 155:30 help: Try this
+test.rs:        (b.sin() * (a.sin() + a.cos())) - ((a.cos() - a.sin()) * b.cos());
 ```
 
 As you can see, it will report numerically instable expressions, and suggest a

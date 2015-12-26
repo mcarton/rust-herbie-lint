@@ -88,10 +88,10 @@ fn main() {
 
     (4.5f64).abs();
 
-    (a*a + b*b).sqrt();
-    //~^ ERROR
-    //~| HELP Try this
-    //~| SUGGESTION a.hypot(b)
+    //(a*a + b*b).sqrt();
+    //**^ ERROR
+    //**| HELP Try this
+    //**| SUGGESTION a.hypot(b)
 
     //(a*a + (-4. * -4.)).sqrt();
     //**^ ERROR
@@ -149,4 +149,14 @@ fn main() {
 
     (a/get_struct().a + c) * get_struct().a;
     (a/e.a + c) * e.b;
+
+    1. - a.cos();
+    //~^ ERROR
+    //~| HELP Try this
+    //~| SUGGESTION (a.sin() * a.sin()) / a.cos().log1p().exp()
+
+    (a+b).sin() - (a+b).cos();
+    //~^ ERROR
+    //~| HELP Try this
+    //~| SUGGESTION (b.sin() * (a.sin() + a.cos())) - ((a.cos() - a.sin()) * b.cos())
 }

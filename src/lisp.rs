@@ -11,6 +11,7 @@ use syntax::ast::{FloatTy, Name};
 use syntax::codemap::{Span, Spanned};
 use utils::{merge_span, snippet};
 
+#[derive(Clone)]
 pub enum LispExpr {
     Binary(BinOp_, Box<LispExpr>, Box<LispExpr>),
     Fun(String, Vec<LispExpr>),
@@ -31,9 +32,9 @@ impl std::fmt::Debug for LispExpr {
 /// Warning: *MUST* be alphabetized on Herbie name.
 /// Herbie also supports the following:
 ///   * cot (cotangent),
-///   * expt (expi, expf),
-///   * mod
-///   * sqt (square),
+///   * expt (Rust has powi vs. powf),
+///   * mod,
+///   * sqr (square),
 const KNOW_FUNS : &'static [(&'static str, &'static str, usize)] = &[
     ("abs",   "abs",    1),
     ("acos",  "acos",   1),
@@ -44,6 +45,7 @@ const KNOW_FUNS : &'static [(&'static str, &'static str, usize)] = &[
     ("cosh",  "cosh",   1),
     ("exp",   "exp",    1),
     ("expm1", "exp_m1", 1),
+    ("expt",  "powf",   2),
     ("hypot", "hypot",  2),
     ("log",   "ln",     1),
     ("log1p", "ln_1p",  1),
@@ -452,7 +454,7 @@ impl Parser {
         loop {
             let c = self.get_char(it, false);
             if let Some(c) = c {
-                if 'a' <= c && c <= 'z' {
+                if c.is_alphanumeric() {
                     buf.push(c);
                     continue;
                 }
@@ -476,6 +478,9 @@ impl Parser {
                 if KNOW_FUNS[idx].2 == params.len() {
                     return Ok(LispExpr::Fun(buf, params))
                 }
+            }
+            else if buf == "sqr" && params.len() == 1 {
+                return Ok(LispExpr::Binary(BinOp_::BiMul, box params[0].clone(), box params.remove(0)))
             }
         }
 
