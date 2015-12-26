@@ -1,3 +1,4 @@
+use conf;
 use lisp::LispExpr;
 use lisp;
 use rusqlite as sql;
@@ -28,7 +29,8 @@ impl Herbie {
 
         self.initialized = true;
 
-        let conn = try!(sql::Connection::open_with_flags("Herbie.db", sql::SQLITE_OPEN_READ_ONLY));
+        let conf = conf::read_conf();
+        let conn = try!(sql::Connection::open_with_flags(conf.db_path.as_ref(), sql::SQLITE_OPEN_READ_ONLY));
         let mut query = try!(conn.prepare("SELECT * FROM HerbieResults"));
 
         self.subs = try!(query.query(&[])).filter_map(|row| {

@@ -12,10 +12,13 @@ extern crate rustc;
 extern crate rustc_plugin;
 #[macro_use]
 extern crate rustc_front;
+extern crate rustc_serialize;
 extern crate syntax;
+extern crate toml;
 
 use rustc_plugin::Registry;
 
+mod conf;
 pub mod lint;
 pub mod lisp;
 mod utils;
