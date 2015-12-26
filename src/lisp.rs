@@ -472,11 +472,14 @@ impl Parser {
             }
 
             try!(self.expect(it, ')', true));
-            Ok(LispExpr::Fun(buf, params))
+            if let Ok(idx) = KNOW_FUNS.binary_search_by(|p| p.0.cmp(&buf)) {
+                if KNOW_FUNS[idx].2 == params.len() {
+                    return Ok(LispExpr::Fun(buf, params))
+                }
+            }
         }
-        else {
-            Err(ParseError::Ident)
-        }
+
+        Err(ParseError::Ident)
     }
 
     fn parse_op<It: Iterator<Item=char>>(&mut self, it: &mut It, op: BinOp_) -> Result<LispExpr, ParseError> {

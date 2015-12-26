@@ -26,6 +26,9 @@ fn main() {
     integers();
 
     let (a, b, c) = (0., 0., 0.);
+
+    a*a + b*b;
+
     (a/a + a) * a;
     //~^ ERROR
     //~| HELP Try this
@@ -85,10 +88,10 @@ fn main() {
 
     (4.5f64).abs();
 
-    //(a*a + b*b).sqrt();
-    //**^ ERROR
-    //**| HELP Try this
-    //**| SUGGESTION a.hypot(b)
+    (a*a + b*b).sqrt();
+    //~^ ERROR
+    //~| HELP Try this
+    //~| SUGGESTION a.hypot(b)
 
     //(a*a + (-4. * -4.)).sqrt();
     //**^ ERROR
