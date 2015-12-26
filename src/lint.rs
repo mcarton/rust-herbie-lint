@@ -8,22 +8,30 @@ use syntax::ast::FloatTy;
 
 #[derive(Debug)]
 pub struct Herbie {
-    pub subs: Option<Vec<(LispExpr, LispExpr)>>,
+    initialized: bool,
+    subs: Vec<(LispExpr, LispExpr)>,
 }
 
 impl Herbie {
 
     pub fn new() -> Herbie {
         Herbie {
-            subs: None,
+            initialized: false,
+            subs: Vec::new(),
         }
     }
 
     pub fn init(&mut self) -> Result<(), sql::Error> {
+        if self.initialized {
+            return Ok(())
+        }
+
+        self.initialized = true;
+
         let conn = try!(sql::Connection::open_with_flags("Herbie.db", sql::SQLITE_OPEN_READ_ONLY));
         let mut query = try!(conn.prepare("SELECT * FROM HerbieResults"));
 
-        self.subs = Some(try!(query.query(&[])).filter_map(|row| {
+        self.subs = try!(query.query(&[])).filter_map(|row| {
             match row {
                 Ok(row) => {
                     let cmdin : String = row.get(1);
@@ -51,7 +59,7 @@ impl Herbie {
                 }
                 Err(..) => None,
             }
-        }).collect());
+        }).collect();
 
         Ok(())
     }
@@ -75,11 +83,17 @@ impl LateLintPass for Herbie {
             return;
         }
 
-        if self.subs.is_none() {
-            self.init().expect("Could not initialize Herbie-Lint");
+        if let Err(err) =  self.init() {
+            cx.span_lint_note(
+                HERBIE,
+                cx.krate.span,
+                "Could not initialize Herbie-Lint",
+                cx.krate.span,
+                &format!("Got SQL error: {}", err)
+            );
         }
 
-        for &(ref cmdin, ref cmdout) in self.subs.as_ref().unwrap() {
+        for &(ref cmdin, ref cmdout) in &self.subs {
             if let Some(bindings) = LispExpr::match_expr(expr, cmdin) {
                 cx.span_lint(HERBIE, expr.span, "Numerically unstable expression");
                 cx.sess().span_suggestion(expr.span, "Try this", cmdout.to_rust(cx, &bindings));
