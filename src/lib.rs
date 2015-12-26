@@ -18,6 +18,7 @@ use rustc_plugin::Registry;
 
 pub mod lint;
 mod lisp;
+mod utils;
 
 #[plugin_registrar]
 pub fn plugin_registrar(reg: &mut Registry) {

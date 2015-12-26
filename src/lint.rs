@@ -11,6 +11,7 @@ pub struct Herbie {
 
 impl Herbie {
 
+    // TODO: Init only at first floating point expr
     pub fn new() -> Result<Herbie, sql::Error> {
         let conn = try!(sql::Connection::open_with_flags("Herbie.db", sql::SQLITE_OPEN_READ_ONLY));
         let mut query = try!(conn.prepare("SELECT * FROM HerbieResults"));
@@ -21,16 +22,15 @@ impl Herbie {
                         let cmdin : String = row.get(1);
                         let cmdout : String = row.get(2);
 
+                        if cmdin == cmdout {
+                            return None;
+                        }
+
                         match lisp::parse(&cmdin) {
                             Ok(cmdin) => {
                                 match lisp::parse(&cmdout) {
                                     Ok(cmdout) => {
-                                        if !cmdin.is_form_of(&cmdout) {
-                                            Some((cmdin, cmdout))
-                                        }
-                                        else {
-                                            None
-                                        }
+                                        Some((cmdin, cmdout))
                                     }
                                     Err(..) => None,
                                 }
@@ -57,10 +57,10 @@ impl LintPass for Herbie {
 
 impl LateLintPass for Herbie {
     fn check_expr(&mut self, cx: &LateContext, expr: &Expr) {
-        if let Ok(lisp) = LispExpr::from_expr(expr) {
-            if let Some(&(_, ref cmdout)) = self.subs.iter().find(|&&(ref cmdin, _)| lisp.is_form_of(cmdin)) {
+        for &(ref cmdin, ref cmdout) in &self.subs {
+            if let Some(bindings) = LispExpr::match_expr(expr, cmdin) {
                 cx.span_lint(HERBIE, expr.span, "Numerically unstable expression");
-                cx.sess().span_suggestion(expr.span, "Try this", format!("{} ↔ {}", cmdout.to_lisp(), cmdout.to_rust()));
+                cx.sess().span_suggestion(expr.span, "Try this", format!("{} ↔ {}", cmdout.to_lisp(), cmdout.to_rust(cx, &bindings)));
             }
         }
     }

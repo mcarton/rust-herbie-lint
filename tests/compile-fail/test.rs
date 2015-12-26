@@ -79,10 +79,15 @@ fn main() {
 
     (4.5f64).abs();
 
-    (a*a + b*b).sqrt();
-    //~^ ERROR
-    //~| HELP Try this
-    //~| SUGGESTION (hypot $0 $1)
+    //(a*a + b*b).sqrt();
+    //**^ ERROR
+    //**| HELP Try this
+    //**| SUGGESTION (hypot $0 $1)
+
+    //(a*a + (-4. * -4.)).sqrt();
+    //**^ ERROR
+    //**| HELP Try this
+    //**| SUGGESTION (hypot $0 $1)
 
     ((a-b) * (a-b)).sqrt();
     //~^ ERROR

@@ -1,5 +1,6 @@
 #![cfg_attr(feature="clippy", allow(float_cmp))]
 
+use rustc::lint::LateContext;
 use rustc_front::hir::*;
 use rustc_front::util::{binop_to_string, unop_to_string};
 use std::collections::HashMap;
@@ -7,7 +8,8 @@ use std::collections::hash_map::Entry;
 use std;
 use syntax::ast::Lit_::*;
 use syntax::ast::{FloatTy, Name};
-use syntax::ptr::P;
+use syntax::codemap::{Span, Spanned};
+use utils::{merge_span, snippet};
 
 pub enum LispExpr {
     Binary(BinOp_, Box<LispExpr>, Box<LispExpr>),
@@ -52,22 +54,26 @@ const KNOW_FUNS : &'static [(&'static str, &'static str, usize)] = &[
     ("tanh",  "tanh",   1),
 ];
 
+enum MatchBinding {
+    Field(Option<QSelf>, Path, Spanned<Name>),
+    Ident(Option<QSelf>, Path),
+    Lit(f64, Span),
+    Other(Span),
+    TupField(Option<QSelf>, Path, Spanned<usize>),
+}
+
+pub struct MatchBindings {
+    bindings: HashMap<u64, MatchBinding>
+}
 
 impl LispExpr {
 
-    pub fn is_form_of(matchee: &Expr, other: &LispExpr) -> bool {
-        enum Binded {
-            Field(Option<QSelf>, bool, HirVec<PathSegment>, Name),
-            Ident(Option<QSelf>, bool, P<[PathSegment]>),
-            Lit(f64),
-            Other,
-            TupField(Option<QSelf>, bool, HirVec<PathSegment>, usize),
-        }
+    pub fn match_expr(matchee: &Expr, other: &LispExpr) -> Option<MatchBindings> {
 
-        fn is_form_of_impl(lhs: &Expr, rhs: &LispExpr, ids: &mut HashMap<u64, Binded>) -> bool {
-            fn bind_unknown(rid: u64, ids: &mut HashMap<u64, Binded>) -> bool {
+        fn match_expr_impl(lhs: &Expr, rhs: &LispExpr, ids: &mut HashMap<u64, MatchBinding>) -> bool {
+            fn bind_unknown(rid: u64, span: Span, ids: &mut HashMap<u64, MatchBinding>) -> bool {
                 if let Entry::Vacant(vacant) = ids.entry(rid) {
-                    vacant.insert(Binded::Other);
+                    vacant.insert(MatchBinding::Other(span));
                     true
                 }
                 else {
@@ -78,8 +84,8 @@ impl LispExpr {
             match (&lhs.node, rhs) {
                 (&ExprBinary(lop, ref lp1, ref lp2), &LispExpr::Binary(rop, ref rp1, ref rp2)) => {
                     lop.node == rop
-                    && is_form_of_impl(lp1, rp1, ids)
-                    && is_form_of_impl(lp2, rp2, ids)
+                    && match_expr_impl(lp1, rp1, ids)
+                    && match_expr_impl(lp2, rp2, ids)
                 },
                 (&ExprMethodCall(ref lfun, ref ascripted_type, ref lp), &LispExpr::Fun(ref rfun, ref rp)) if ascripted_type.is_empty() => {
                     let name = lfun.node.as_str();
@@ -89,7 +95,7 @@ impl LispExpr {
                         }
                     ) {
                         herbie_name == rfun
-                        && lp.iter().zip(rp).all(|(lp, rp)| is_form_of_impl(lp, rp, ids))
+                        && lp.iter().zip(rp).all(|(lp, rp)| match_expr_impl(lp, rp, ids))
                     }
                     else {
                         false
@@ -98,17 +104,17 @@ impl LispExpr {
                 (&ExprPath(ref qualif, ref path), &LispExpr::Ident(rid)) => {
                     match ids.entry(rid) {
                         Entry::Occupied(entry) => {
-                            if let Binded::Ident(ref bqualif, global, ref bpath) = *entry.get() {
+                            if let MatchBinding::Ident(ref bqualif, ref bpath) = *entry.get() {
                                 qualif == bqualif
-                                && path.global == global
-                                && &path.segments == bpath
+                                && path.global == bpath.global
+                                && &path.segments == &bpath.segments
                             }
                             else {
                                 false
                             }
                         },
                         Entry::Vacant(vacant) => {
-                            vacant.insert(Binded::Ident(qualif.clone(), path.global, path.segments.clone()));
+                            vacant.insert(MatchBinding::Ident(qualif.clone(), path.clone()));
                             true
                         }
                     }
@@ -121,13 +127,13 @@ impl LispExpr {
                         _ => false
                     }
                 },
-                (&ExprLit(ref lit), &LispExpr::Ident(rid)) => {
-                    match lit.node {
+                (&ExprLit(ref expr), &LispExpr::Ident(rid)) => {
+                    match expr.node {
                         LitFloat(ref lit, FloatTy::TyF64) | LitFloatUnsuffixed(ref lit) => {
                             if let Ok(lit) = lit.parse() {
                                 match ids.entry(rid) {
                                     Entry::Occupied(entry) => {
-                                        if let Binded::Lit(binded) = *entry.get() {
+                                        if let MatchBinding::Lit(binded, _) = *entry.get() {
                                             lit == binded
                                         }
                                         else {
@@ -135,76 +141,81 @@ impl LispExpr {
                                         }
                                     },
                                     Entry::Vacant(vacant) => {
-                                        vacant.insert(Binded::Lit(lit));
+                                        vacant.insert(MatchBinding::Lit(lit, expr.span));
                                         true
                                     }
                                 }
                             }
                             else {
-                                bind_unknown(rid, ids)
+                                bind_unknown(rid, lhs.span, ids)
                             }
                         },
-                        _ => bind_unknown(rid, ids)
+                        _ => bind_unknown(rid, lhs.span, ids)
                     }
                 },
                 (&ExprUnary(lop, ref lp), &LispExpr::Unary(rop, ref rp)) => {
-                    lop == rop && is_form_of_impl(lp, rp, ids)
+                    lop == rop && match_expr_impl(lp, rp, ids)
                 },
                 (&ExprTupField(ref tup, ref idx), &LispExpr::Ident(rid)) => {
                     if let ExprPath(ref qualif, ref path) = tup.node {
                         return match ids.entry(rid) {
                             Entry::Occupied(entry) => {
-                                if let Binded::TupField(ref bqualif, global, ref bpath, bidx) = *entry.get() {
+                                if let MatchBinding::TupField(ref bqualif, ref bpath, bidx) = *entry.get() {
                                     qualif == bqualif
-                                    && path.global == global
-                                    && &path.segments == bpath
-                                    && idx.node == bidx
+                                    && path.global == bpath.global
+                                    && path.segments == bpath.segments
+                                    && idx.node == bidx.node
                                 }
                                 else {
                                     false
                                 }
                             },
                             Entry::Vacant(vacant) => {
-                                vacant.insert(Binded::TupField(qualif.clone(), path.global, path.segments.clone(), idx.node));
+                                vacant.insert(MatchBinding::TupField(qualif.clone(), path.clone(), idx.clone()));
                                 true
                             }
                         }
                     }
 
-                    bind_unknown(rid, ids)
+                    bind_unknown(rid, lhs.span, ids)
                 },
                 (&ExprField(ref expr, ref name), &LispExpr::Ident(rid)) => {
                     if let ExprPath(ref qualif, ref path) = expr.node {
                         return match ids.entry(rid) {
                             Entry::Occupied(entry) => {
-                                if let Binded::Field(ref bqualif, global, ref bpath, ref bname) = *entry.get() {
+                                if let MatchBinding::Field(ref bqualif, ref bpath, ref bname) = *entry.get() {
                                     qualif == bqualif
-                                    && path.global == global
-                                    && &path.segments == bpath
-                                    && &name.node == bname
+                                    && path.global == bpath.global
+                                    && path.segments == bpath.segments
+                                    && name.node == bname.node
                                 }
                                 else {
                                     false
                                 }
                             },
                             Entry::Vacant(vacant) => {
-                                vacant.insert(Binded::Field(qualif.clone(), path.global, path.segments.clone(), name.node));
+                                vacant.insert(MatchBinding::Field(qualif.clone(), path.clone(), name.clone()));
                                 true
                             }
                         }
                     }
 
-                    bind_unknown(rid, ids)
+                    bind_unknown(rid, lhs.span, ids)
                 },
                 (_, &LispExpr::Ident(rid)) => {
-                    bind_unknown(rid, ids)
+                    bind_unknown(rid, lhs.span, ids)
                 },
                 _ => false,
             }
         }
 
         let mut ids = HashMap::new();
-        is_form_of_impl(matchee, other, &mut ids)
+        if match_expr_impl(matchee, other, &mut ids) {
+            Some(MatchBindings { bindings: ids })
+        }
+        else {
+            None
+        }
     }
 
     // TODO: should probably not be pub
@@ -238,14 +249,14 @@ impl LispExpr {
         }
     }
 
-    pub fn to_rust(&self) -> String {
+    pub fn to_rust(&self, cx: &LateContext, bindings: &MatchBindings) -> String {
         match *self {
             LispExpr::Binary(op, ref lhs, ref rhs) => {
-                format!("({}) {} ({})", lhs.to_rust(), binop_to_string(op), rhs.to_rust())
+                format!("({}) {} ({})", lhs.to_rust(cx, bindings), binop_to_string(op), rhs.to_rust(cx, bindings))
             },
             LispExpr::Fun(ref name, ref params) => {
                 let mut buf = String::new();
-                buf.push_str(&params[0].to_rust());
+                buf.push_str(&params[0].to_rust(cx, bindings));
                 buf.push('.');
                 buf.push_str(name);
                 buf.push('(');
@@ -254,7 +265,7 @@ impl LispExpr {
                     if i != 0 {
                         buf.push_str(", ");
                     }
-                    buf.push_str(&p.to_rust());
+                    buf.push_str(&p.to_rust(cx, bindings));
                 }
 
                 buf.push(')');
@@ -264,10 +275,26 @@ impl LispExpr {
                 format!("{}", f)
             },
             LispExpr::Unary(op, ref expr) => {
-                format!("{}{}", unop_to_string(op), expr.to_rust())
+                format!("{}{}", unop_to_string(op), expr.to_rust(cx, bindings))
             },
             LispExpr::Ident(id) => {
-                format!("${}", id)
+                match *bindings.bindings.get(&id).expect("Got an unbinded id!") {
+                    MatchBinding::Field(_, ref path, ref name) => {
+                        snippet(cx, merge_span(path.span, name.span), "..").into_owned()
+                    },
+                    MatchBinding::Ident(_, ref path) => {
+                        snippet(cx, path.span, "..").into_owned()
+                    },
+                    MatchBinding::Lit(_, ref span) => {
+                        snippet(cx, *span, "..").into_owned()
+                    },
+                    MatchBinding::Other(ref span) => {
+                        snippet(cx, *span, "..").into_owned()
+                    },
+                    MatchBinding::TupField(_, ref path, ref idx) => {
+                        snippet(cx, merge_span(path.span, idx.span), "..").into_owned()
+                    },
+                }
             },
         }
     }
