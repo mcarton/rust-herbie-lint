@@ -23,7 +23,7 @@ pub enum LispExpr {
 impl std::fmt::Debug for LispExpr {
 
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-        f.pad(&self.to_lisp())
+        f.pad(&self.to_lisp("$"))
     }
 
 }
@@ -214,10 +214,10 @@ impl LispExpr {
     }
 
     // TODO: should probably not be pub
-    pub fn to_lisp(&self) -> String {
+    pub fn to_lisp(&self, placeholder: &str) -> String {
         match *self {
             LispExpr::Binary(op, ref lhs, ref rhs) => {
-                format!("({} {} {})", binop_to_string(op), lhs.to_lisp(), rhs.to_lisp())
+                format!("({} {} {})", binop_to_string(op), lhs.to_lisp(placeholder), rhs.to_lisp(placeholder))
             },
             LispExpr::Fun(ref name, ref params) => {
                 let mut buf = String::new();
@@ -226,7 +226,7 @@ impl LispExpr {
 
                 for p in params {
                     buf.push(' ');
-                    buf.push_str(&p.to_lisp());
+                    buf.push_str(&p.to_lisp(placeholder));
                 }
 
                 buf.push(')');
@@ -236,10 +236,10 @@ impl LispExpr {
                 format!("{}", f)
             },
             LispExpr::Unary(op, ref expr) => {
-                format!("({} {})", unop_to_string(op), expr.to_lisp())
+                format!("({} {})", unop_to_string(op), expr.to_lisp(placeholder))
             },
             LispExpr::Ident(id) => {
-                format!("${}", id)
+                format!("{}{}", placeholder, id)
             },
         }
     }
