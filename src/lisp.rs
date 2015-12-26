@@ -83,6 +83,15 @@ impl LispExpr {
                 }
             }
 
+            fn try_insert<Occ, Vac>(rid: u64, ids: &mut HashMap<u64, MatchBinding>, occ: Occ, vac: Vac) -> bool
+            where Occ: FnOnce(&MatchBinding) -> bool,
+                  Vac: FnOnce() -> MatchBinding {
+                match ids.entry(rid) {
+                    Entry::Occupied(entry) => occ(entry.get()),
+                    Entry::Vacant(vacant) => { vacant.insert(vac()); true },
+                }
+            }
+
             match (&lhs.node, rhs) {
                 (&ExprBinary(lop, ref lp1, ref lp2), &LispExpr::Binary(rop, ref rp1, ref rp2)) => {
                     lop.node == rop
@@ -104,22 +113,18 @@ impl LispExpr {
                     }
                 },
                 (&ExprPath(ref qualif, ref path), &LispExpr::Ident(rid)) => {
-                    match ids.entry(rid) {
-                        Entry::Occupied(entry) => {
-                            if let MatchBinding::Ident(ref bqualif, ref bpath) = *entry.get() {
-                                qualif == bqualif
-                                && path.global == bpath.global
-                                && &path.segments == &bpath.segments
-                            }
-                            else {
-                                false
-                            }
-                        },
-                        Entry::Vacant(vacant) => {
-                            vacant.insert(MatchBinding::Ident(qualif.clone(), path.clone()));
-                            true
+                    try_insert(rid, ids, |entry| {
+                        if let MatchBinding::Ident(ref bqualif, ref bpath) = *entry {
+                            qualif == bqualif
+                            && path.global == bpath.global
+                            && &path.segments == &bpath.segments
                         }
-                    }
+                        else {
+                            false
+                        }
+                    }, || {
+                        MatchBinding::Ident(qualif.clone(), path.clone())
+                    })
                 },
                 (&ExprLit(ref lit), &LispExpr::Lit(r)) => {
                     match lit.node {
@@ -133,20 +138,16 @@ impl LispExpr {
                     match expr.node {
                         LitFloat(ref lit, FloatTy::TyF64) | LitFloatUnsuffixed(ref lit) => {
                             if let Ok(lit) = lit.parse() {
-                                match ids.entry(rid) {
-                                    Entry::Occupied(entry) => {
-                                        if let MatchBinding::Lit(binded, _) = *entry.get() {
-                                            lit == binded
-                                        }
-                                        else {
-                                            false
-                                        }
-                                    },
-                                    Entry::Vacant(vacant) => {
-                                        vacant.insert(MatchBinding::Lit(lit, expr.span));
-                                        true
+                                try_insert(rid, ids, |entry| {
+                                    if let MatchBinding::Lit(binded, _) = *entry {
+                                        lit == binded
                                     }
-                                }
+                                    else {
+                                        false
+                                    }
+                                }, || {
+                                    MatchBinding::Lit(lit, expr.span)
+                                })
                             }
                             else {
                                 bind_unknown(rid, lhs.span, ids)
@@ -160,46 +161,38 @@ impl LispExpr {
                 },
                 (&ExprTupField(ref tup, ref idx), &LispExpr::Ident(rid)) => {
                     if let ExprPath(ref qualif, ref path) = tup.node {
-                        return match ids.entry(rid) {
-                            Entry::Occupied(entry) => {
-                                if let MatchBinding::TupField(ref bqualif, ref bpath, bidx) = *entry.get() {
-                                    qualif == bqualif
-                                    && path.global == bpath.global
-                                    && path.segments == bpath.segments
-                                    && idx.node == bidx.node
-                                }
-                                else {
-                                    false
-                                }
-                            },
-                            Entry::Vacant(vacant) => {
-                                vacant.insert(MatchBinding::TupField(qualif.clone(), path.clone(), idx.clone()));
-                                true
+                        return try_insert(rid, ids, |entry| {
+                            if let MatchBinding::TupField(ref bqualif, ref bpath, bidx) = *entry {
+                                qualif == bqualif
+                                && path.global == bpath.global
+                                && path.segments == bpath.segments
+                                && idx.node == bidx.node
                             }
-                        }
+                            else {
+                                false
+                            }
+                        }, || {
+                            MatchBinding::TupField(qualif.clone(), path.clone(), idx.clone())
+                        })
                     }
 
                     bind_unknown(rid, lhs.span, ids)
                 },
                 (&ExprField(ref expr, ref name), &LispExpr::Ident(rid)) => {
                     if let ExprPath(ref qualif, ref path) = expr.node {
-                        return match ids.entry(rid) {
-                            Entry::Occupied(entry) => {
-                                if let MatchBinding::Field(ref bqualif, ref bpath, ref bname) = *entry.get() {
-                                    qualif == bqualif
-                                    && path.global == bpath.global
-                                    && path.segments == bpath.segments
-                                    && name.node == bname.node
-                                }
-                                else {
-                                    false
-                                }
-                            },
-                            Entry::Vacant(vacant) => {
-                                vacant.insert(MatchBinding::Field(qualif.clone(), path.clone(), name.clone()));
-                                true
+                        return try_insert(rid, ids, |entry| {
+                            if let MatchBinding::Field(ref bqualif, ref bpath, ref bname) = *entry {
+                                qualif == bqualif
+                                && path.global == bpath.global
+                                && path.segments == bpath.segments
+                                && name.node == bname.node
                             }
-                        }
+                            else {
+                                false
+                            }
+                        }, || {
+                            MatchBinding::Field(qualif.clone(), path.clone(), name.clone())
+                        })
                     }
 
                     bind_unknown(rid, lhs.span, ids)
