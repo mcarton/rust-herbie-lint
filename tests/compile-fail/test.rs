@@ -88,15 +88,10 @@ fn main() {
 
     (4.5f64).abs();
 
-    //(a*a + b*b).sqrt();
-    //**^ ERROR
-    //**| HELP Try this
-    //**| SUGGESTION a.hypot(b)
-
-    //(a*a + (-4. * -4.)).sqrt();
-    //**^ ERROR
-    //**| HELP Try this
-    //**| SUGGESTION a.hypot(-4.))
+    (a*a + b*b).sqrt();
+    //~^ ERROR
+    //~| HELP Try this
+    //~| SUGGESTION a.hypot(b)
 
     a.floor();
 
@@ -105,7 +100,13 @@ fn main() {
     //~| HELP Try this
     //~| SUGGESTION ((c.floor()) * b) + a
 
+    (a/b + (0.5 + c).floor()) * b;
+    //~^ ERROR
+    //~| HELP Try this
+    //~| SUGGESTION (((0.5 + c).floor()) * b) + a
+
     let d = (0., 0.);
+    let d2 = (0., 0.);
 
     (a/b + d.0) * b;
     //~^ ERROR
@@ -122,10 +123,15 @@ fn main() {
     //~| HELP Try this
     //~| SUGGESTION (c * d.0) + a
 
+    (a/d.0 + c) * d2.0;
+    (a/d.0 + c) * a;
+    (a/0. + c) * a;
+
     (a/d.0 + c) * d.1;
     (a/get_tup().0 + c) * get_tup().0;
 
     let e = get_struct();
+    let e2 = get_struct();
 
     (a/b + e.a) * b;
     //~^ ERROR
@@ -141,6 +147,8 @@ fn main() {
     //~^ ERROR
     //~| HELP Try this
     //~| SUGGESTION (c * e.a) + a
+
+    (a/e.a + c) * e2.a;
 
     (a/get_struct().a + c) * get_struct().a;
     (a/e.a + c) * e.b;

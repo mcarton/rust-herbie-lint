@@ -22,6 +22,10 @@ fn test_parser() {
     assert_eq!(parse("herbie0"), Ok(Ident(0)));
     assert_eq!(parse("herbie"), Ok(Ident(0)));
 
+    assert_eq!(parse("(+ 0. 0.) foobar"), Err(ParseError::EOE));
+    assert_eq!(parse("("), Err(ParseError::EOE));
+    assert_eq!(parse("0.eee"), Err(ParseError::Float));
+
     assert_eq!(parse("(+ 0. herbie1)"), Ok(Binary(BiAdd, box Lit(0.), box Ident(0))));
     assert_eq!(parse("(+ herbie0 herbie1)"), Ok(Binary(BiAdd, box Ident(0), box Ident(1))));
 
