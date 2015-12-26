@@ -2,7 +2,9 @@ use lisp::LispExpr;
 use lisp;
 use rusqlite as sql;
 use rustc::lint::{LateContext, LintArray, LintContext, LintPass, LateLintPass};
+use rustc::middle::ty::TypeVariants;
 use rustc_front::hir::*;
+use syntax::ast::FloatTy;
 
 #[derive(Debug)]
 pub struct Herbie {
@@ -61,6 +63,12 @@ impl LintPass for Herbie {
 
 impl LateLintPass for Herbie {
     fn check_expr(&mut self, cx: &LateContext, expr: &Expr) {
+        let ty = cx.tcx.expr_ty(expr);
+
+        if ty.sty != TypeVariants::TyFloat(FloatTy::TyF64) {
+            return;
+        }
+
         for &(ref cmdin, ref cmdout) in &self.subs {
             if let Some(bindings) = LispExpr::match_expr(expr, cmdin) {
                 cx.span_lint(HERBIE, expr.span, "Numerically unstable expression");
