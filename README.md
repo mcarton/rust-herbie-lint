@@ -3,7 +3,7 @@
 ## What
 
 This plugin can add warnings or errors to your crate when using a numerically
-instable expression.
+instable floating point expression.
 
 Quick example of what you can get when compiling `test/compile-fail/test.rs`:
 ```rust
@@ -25,7 +25,7 @@ test.rs:        (b.sin() * (a.sin() + a.cos())) - ((a.cos() - a.sin()) * b.cos()
 ```
 
 As you can see, it will report numerically instable expressions, and suggest a
-(sometimes over-parenthised) more stable correction.
+(sometimes over-parenthesized) more stable correction.
 
 ## Usage
 This is a `rustc` plugin, to use it, you need a *nightly* Rust.
@@ -35,7 +35,7 @@ database format is the same as [Herbie GHC Plugin (for Haskell)][ghc-herbie]
 from which this plugin is inspired so [this file][ghc-herbie-db] should work.
 Just put it in the same directory you call `cargo` or `rustc` from.
 
-Add in your Cargo.toml:
+Add in your *Cargo.toml*:
 
 ```toml
 [dependencies]
