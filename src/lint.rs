@@ -21,8 +21,11 @@ impl Herbie {
                     Ok(row) => {
                         let cmdin : String = row.get(1);
                         let cmdout : String = row.get(2);
+                        // row.get(3) is opts ↔ Herbies options
+                        let errin = row.get_checked(4).unwrap_or(0.);
+                        let errout = row.get_checked(5).unwrap_or(0.);
 
-                        if cmdin == cmdout {
+                        if cmdin == cmdout || errin <= errout {
                             return None;
                         }
 

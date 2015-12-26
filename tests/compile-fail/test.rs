@@ -98,11 +98,6 @@ fn main() {
     //**| HELP Try this
     //**| SUGGESTION a.hypot(-4.))
 
-    ((a-b) * (a-b)).sqrt();
-    //~^ ERROR
-    //~| HELP Try this
-    //~| SUGGESTION a - b
-
     a.floor();
 
     (a/b + c.floor()) * b;
