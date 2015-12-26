@@ -250,53 +250,80 @@ impl LispExpr {
     }
 
     pub fn to_rust(&self, cx: &LateContext, bindings: &MatchBindings) -> String {
-        match *self {
-            LispExpr::Binary(op, ref lhs, ref rhs) => {
-                format!("({}) {} ({})", lhs.to_rust(cx, bindings), binop_to_string(op), rhs.to_rust(cx, bindings))
-            },
-            LispExpr::Fun(ref name, ref params) => {
-                let mut buf = String::new();
-                buf.push_str(&params[0].to_rust(cx, bindings));
-                buf.push('.');
-                buf.push_str(name);
-                buf.push('(');
-
-                for (i, p) in params.iter().skip(1).enumerate() {
-                    if i != 0 {
-                        buf.push_str(", ");
+        fn to_rust_impl(expr: &LispExpr, cx: &LateContext, bindings: &MatchBindings) -> (String, bool) {
+            match *expr {
+                LispExpr::Binary(op, ref lhs, ref rhs) => {
+                    match (to_rust_impl(lhs, cx, bindings), to_rust_impl(rhs, cx, bindings)) {
+                        ((lhs, false), (rhs, false)) => {
+                            (format!("{} {} {}", lhs, binop_to_string(op), rhs), true)
+                        },
+                        ((lhs, true), (rhs, false)) => {
+                            (format!("({}) {} {}", lhs, binop_to_string(op), rhs), true)
+                        },
+                        ((lhs, false), (rhs, true)) => {
+                            (format!("{} {} ({})", lhs, binop_to_string(op), rhs), true)
+                        },
+                        ((lhs, true), (rhs, true)) => {
+                            (format!("({}) {} ({})", lhs, binop_to_string(op), rhs), true)
+                        },
                     }
-                    buf.push_str(&p.to_rust(cx, bindings));
-                }
+                },
+                LispExpr::Fun(ref name, ref params) => {
+                    let mut buf = String::new();
+                    match to_rust_impl(&params[0], cx, bindings) {
+                        (expr, false) => buf.push_str(&expr),
+                        (expr, true) => {
+                            buf.push('(');
+                            buf.push_str(&expr);
+                            buf.push(')');
+                        },
+                    }
+                    buf.push('.');
+                    buf.push_str(name);
+                    buf.push('(');
 
-                buf.push(')');
-                buf
-            },
-            LispExpr::Lit(f) => {
-                format!("{}", f)
-            },
-            LispExpr::Unary(op, ref expr) => {
-                format!("{}{}", unop_to_string(op), expr.to_rust(cx, bindings))
-            },
-            LispExpr::Ident(id) => {
-                match *bindings.bindings.get(&id).expect("Got an unbinded id!") {
-                    MatchBinding::Field(_, ref path, ref name) => {
-                        snippet(cx, merge_span(path.span, name.span), "..").into_owned()
-                    },
-                    MatchBinding::Ident(_, ref path) => {
-                        snippet(cx, path.span, "..").into_owned()
-                    },
-                    MatchBinding::Lit(_, ref span) => {
-                        snippet(cx, *span, "..").into_owned()
-                    },
-                    MatchBinding::Other(ref span) => {
-                        snippet(cx, *span, "..").into_owned()
-                    },
-                    MatchBinding::TupField(_, ref path, ref idx) => {
-                        snippet(cx, merge_span(path.span, idx.span), "..").into_owned()
-                    },
-                }
-            },
+                    for (i, p) in params.iter().skip(1).enumerate() {
+                        if i != 0 {
+                            buf.push_str(", ");
+                        }
+                        buf.push_str(&to_rust_impl(p, cx, bindings).0);
+                    }
+
+                    buf.push(')');
+                    (buf, false)
+                },
+                LispExpr::Lit(f) => {
+                    (format!("{}", f), false)
+                },
+                LispExpr::Unary(op, ref expr) => {
+                    match to_rust_impl(expr, cx, bindings) {
+                        (expr, false) => (format!("{}{}", unop_to_string(op), expr), true),
+                        (expr, true) => (format!("{}({})", unop_to_string(op), expr), true),
+                    }
+                },
+                LispExpr::Ident(id) => {
+                    match *bindings.bindings.get(&id).expect("Got an unbinded id!") {
+                        MatchBinding::Field(_, ref path, ref name) => {
+                            (snippet(cx, merge_span(path.span, name.span), "..").into_owned(), false)
+                        },
+                        MatchBinding::Ident(_, ref path) => {
+                            (snippet(cx, path.span, "..").into_owned(), false)
+                        },
+                        MatchBinding::Lit(_, ref span) => {
+                            (snippet(cx, *span, "..").into_owned(), false)
+                        },
+                        MatchBinding::Other(ref span) => {
+                            (snippet(cx, *span, "..").into_owned(), true)
+                        },
+                        MatchBinding::TupField(_, ref path, ref idx) => {
+                            (snippet(cx, merge_span(path.span, idx.span), "..").into_owned(), false)
+                        },
+                    }
+                },
+            }
         }
+
+        to_rust_impl(self, cx, bindings).0
     }
 
 }

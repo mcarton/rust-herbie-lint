@@ -29,56 +29,56 @@ fn main() {
     (a/a + a) * a;
     //~^ ERROR
     //~| HELP Try this
-    //~| SUGGESTION (+ (* $2 $1) $0)
+    //~| SUGGESTION (a * a) + a
     (a/b + a) * b;
     //~^ ERROR
     //~| HELP Try this
-    //~| SUGGESTION (+ (* $2 $1) $0)
+    //~| SUGGESTION (a * b) + a
     (a/b + c) * b;
     //~^ ERROR
     //~| HELP Try this
-    //~| SUGGESTION (+ (* $2 $1) $0)
+    //~| SUGGESTION (c * b) + a
 
     (a/b + c) * a;
 
     (0./1. + 2.) * 1.;
     //~^ ERROR
     //~| HELP Try this
-    //~| SUGGESTION (+ (* $2 $1) $0)
+    //~| SUGGESTION (2. * 1.) + 0.
     (1./1. + 2.) * 1.;
     //~^ ERROR
     //~| HELP Try this
-    //~| SUGGESTION (+ (* $2 $1) $0)
+    //~| SUGGESTION (2. * 1.) + 1.
     (1./1. + 1.) * 1.;
     //~^ ERROR
     //~| HELP Try this
-    //~| SUGGESTION (+ (* $2 $1) $0)
+    //~| SUGGESTION (1. * 1.) + 1.
 
     (0./1. + a) * 1.;
     //~^ ERROR
     //~| HELP Try this
-    //~| SUGGESTION (+ (* $2 $1) $0)
+    //~| SUGGESTION (a * 1.) + 0.
     (0./a + 2.) * a;
     //~^ ERROR
     //~| HELP Try this
-    //~| SUGGESTION (+ (* $2 $1) $0)
+    //~| SUGGESTION (2. * a) + 0.
 
     (a/b + get_f64()) * b;
     //~^ ERROR
     //~| HELP Try this
-    //~| SUGGESTION (+ (* $2 $1) $0)
+    //~| SUGGESTION ((get_f64()) * b) + a
     (a/b + (4.5f64).sqrt()) * b;
     //~^ ERROR
     //~| HELP Try this
-    //~| SUGGESTION (+ (* $2 $1) $0)
+    //~| SUGGESTION (((4.5f64).sqrt()) * b) + a
     (a/b + (42 as f64)) * b;
     //~^ ERROR
     //~| HELP Try this
-    //~| SUGGESTION (+ (* $2 $1) $0)
+    //~| SUGGESTION ((42 as f64) * b) + a
     (a/b + { 42. }) * b;
     //~^ ERROR
     //~| HELP Try this
-    //~| SUGGESTION (+ (* $2 $1) $0)
+    //~| SUGGESTION (({ 42. }) * b) + a
 
     (a/get_f64() + c) * get_f64();
     (a/{ 42. } + c) * { 42. };
@@ -88,41 +88,41 @@ fn main() {
     //(a*a + b*b).sqrt();
     //**^ ERROR
     //**| HELP Try this
-    //**| SUGGESTION (hypot $0 $1)
+    //**| SUGGESTION a.hypot(b)
 
     //(a*a + (-4. * -4.)).sqrt();
     //**^ ERROR
     //**| HELP Try this
-    //**| SUGGESTION (hypot $0 $1)
+    //**| SUGGESTION a.hypot(-4.))
 
     ((a-b) * (a-b)).sqrt();
     //~^ ERROR
     //~| HELP Try this
-    //~| SUGGESTION (- $0 $1)
+    //~| SUGGESTION a - b
 
     a.floor();
 
     (a/b + c.floor()) * b;
     //~^ ERROR
     //~| HELP Try this
-    //~| SUGGESTION (+ (* $2 $1) $0)
+    //~| SUGGESTION ((c.floor()) * b) + a
 
     let d = (0., 0.);
 
     (a/b + d.0) * b;
     //~^ ERROR
     //~| HELP Try this
-    //~| SUGGESTION (+ (* $2 $1) $0)
+    //~| SUGGESTION (d.0 * b) + a
 
     (a/b + get_tup().0) * b;
     //~^ ERROR
     //~| HELP Try this
-    //~| SUGGESTION (+ (* $2 $1) $0)
+    //~| SUGGESTION ((get_tup().0) * b) + a
 
     (a/d.0 + c) * d.0;
     //~^ ERROR
     //~| HELP Try this
-    //~| SUGGESTION (+ (* $2 $1) $0)
+    //~| SUGGESTION (c * d.0) + a
 
     (a/d.0 + c) * d.1;
     (a/get_tup().0 + c) * get_tup().0;
@@ -132,17 +132,17 @@ fn main() {
     (a/b + e.a) * b;
     //~^ ERROR
     //~| HELP Try this
-    //~| SUGGESTION (+ (* $2 $1) $0)
+    //~| SUGGESTION (e.a * b) + a
 
     (a/b + get_struct().a) * b;
     //~^ ERROR
     //~| HELP Try this
-    //~| SUGGESTION (+ (* $2 $1) $0)
+    //~| SUGGESTION ((get_struct().a) * b) + a
 
     (a/e.a + c) * e.a;
     //~^ ERROR
     //~| HELP Try this
-    //~| SUGGESTION (+ (* $2 $1) $0)
+    //~| SUGGESTION (c * e.a) + a
 
     (a/get_struct().a + c) * get_struct().a;
     (a/e.a + c) * e.b;
