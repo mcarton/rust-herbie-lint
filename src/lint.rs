@@ -1,14 +1,19 @@
 use conf;
+use itertools::Itertools;
 use lisp::LispExpr;
 use lisp;
 use rusqlite as sql;
 use rustc::lint::{LateContext, LintArray, LintContext, LintPass, LateLintPass};
 use rustc::middle::ty::TypeVariants;
 use rustc_front::hir::*;
+use std::io::Write;
+use std::process::{Command, Stdio};
+use std::str::from_utf8;
 use syntax::ast::FloatTy;
 
 #[derive(Debug)]
 pub struct Herbie {
+    conf: Option<conf::Conf>,
     initialized: bool,
     subs: Vec<(LispExpr, LispExpr)>,
 }
@@ -17,6 +22,7 @@ impl Herbie {
 
     pub fn new() -> Herbie {
         Herbie {
+            conf: None,
             initialized: false,
             subs: Vec::new(),
         }
@@ -30,7 +36,9 @@ impl Herbie {
         self.initialized = true;
 
         let conf = conf::read_conf();
-        let conn = try!(sql::Connection::open_with_flags(conf.db_path.as_ref(), sql::SQLITE_OPEN_READ_ONLY));
+        let conn = try!(sql::Connection::open_with_flags(
+            conf.db_path.as_ref(), sql::SQLITE_OPEN_READ_ONLY
+        ));
         let mut query = try!(conn.prepare("SELECT * FROM HerbieResults"));
 
         self.subs = try!(query.query(&[])).filter_map(|row| {
@@ -62,6 +70,8 @@ impl Herbie {
                 Err(..) => None,
             }
         }).collect();
+
+        self.conf = Some(conf);
 
         Ok(())
     }
@@ -95,11 +105,80 @@ impl LateLintPass for Herbie {
             );
         }
 
+        let mut got_match = false;
         for &(ref cmdin, ref cmdout) in &self.subs {
             if let Some(bindings) = LispExpr::match_expr(expr, cmdin) {
-                cx.span_lint(HERBIE, expr.span, "Numerically unstable expression");
-                cx.sess().span_suggestion(expr.span, "Try this", cmdout.to_rust(cx, &bindings));
+                report(cx, expr, cmdout, &bindings);
+                got_match = true;
             }
         }
+
+        let conf = self.conf.as_ref().unwrap();
+        if !got_match && conf.use_herbie != conf::UseHerbieConf::No {
+            try_with_herbie(cx, expr, &conf.herbie_seed);
+        }
     }
+}
+
+fn try_with_herbie(cx: &LateContext, expr: &Expr, seed: &str) {
+    let (lisp_expr, nb_ids, bindings) = match LispExpr::from_expr(expr) {
+        Some(r) => r,
+        None => return, // TODO: report
+    };
+
+    if lisp_expr.depth() <= 2 {
+        return;
+    }
+
+    // TODO: link to wiki about Herbie.toml
+    cx.sess().span_note(expr.span, "Calling Herbie on the following expression, it might take a while");
+
+    let mut child = Command::new("herbie-inout")
+        .arg("--seed").arg(seed)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+
+    let params = (0..nb_ids).map(|id| format!("herbie{}", id)).join(" ");
+    let lisp_expr = lisp_expr.to_lisp("herbie");
+    let lisp_expr = format!("(lambda ({}) {})\n", params, lisp_expr);
+    let lisp_expr = lisp_expr.as_bytes();
+    child.stdin.as_mut().unwrap().write(lisp_expr).unwrap();
+
+    let output = if let Ok(output) = child.wait_with_output() {
+        if output.status.success() {
+            if let Ok(output) = from_utf8(&output.stdout) {
+                output.to_owned()
+            }
+            else {
+                return
+            }
+        }
+        else {
+            return
+        }
+    }
+    else {
+        return
+    };
+
+    let mut output = output.lines();
+    let errin = output.next().unwrap().split(' ').last().unwrap().parse::<f64>().unwrap();
+    let errout = output.next().unwrap().split(' ').last().unwrap().parse::<f64>().unwrap();
+
+    if errin <= errout {
+        return
+    }
+
+    let mut parser = lisp::Parser::new();
+    let cmdout = parser.parse(&output.next().unwrap()).unwrap();
+
+    report(cx, expr, &cmdout, &bindings);
+}
+
+fn report(cx: &LateContext, expr: &Expr, cmdout: &LispExpr, bindings: &lisp::MatchBindings) {
+    cx.span_lint(HERBIE, expr.span, "Numerically unstable expression");
+    cx.sess().span_suggestion(expr.span, "Try this", cmdout.to_rust(cx, &bindings));
 }

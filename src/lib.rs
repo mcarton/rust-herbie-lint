@@ -5,6 +5,7 @@
 #![cfg_attr(feature="clippy", feature(plugin))]
 #![cfg_attr(feature="clippy", plugin(clippy))]
 
+extern crate itertools;
 extern crate rusqlite;
 #[macro_use]
 extern crate rustc;

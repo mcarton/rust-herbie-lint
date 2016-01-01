@@ -5,6 +5,7 @@ use rustc_front::hir::*;
 use rustc_front::util::{binop_to_string, unop_to_string};
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
+use std::iter::FromIterator;
 use std;
 use syntax::ast::Lit_::*;
 use syntax::ast::{FloatTy, Name};
@@ -35,7 +36,7 @@ impl std::fmt::Debug for LispExpr {
 ///   * expt (Rust has powi vs. powf),
 ///   * mod,
 ///   * sqr (square),
-const KNOW_FUNS : &'static [(&'static str, &'static str, usize)] = &[
+const KNOWN_FUNS : &'static [(&'static str, &'static str, usize)] = &[
     ("abs",   "abs",    1),
     ("acos",  "acos",   1),
     ("asin",  "asin",   1),
@@ -56,6 +57,7 @@ const KNOW_FUNS : &'static [(&'static str, &'static str, usize)] = &[
     ("tanh",  "tanh",   1),
 ];
 
+#[derive(Debug)]
 enum MatchBinding {
     Field(Option<QSelf>, Path, Spanned<Name>),
     Ident(Option<QSelf>, Path),
@@ -64,11 +66,146 @@ enum MatchBinding {
     TupField(Option<QSelf>, Path, Spanned<usize>),
 }
 
+#[derive(Debug)]
 pub struct MatchBindings {
     bindings: HashMap<u64, MatchBinding>
 }
 
 impl LispExpr {
+
+    pub fn from_expr(expr: &Expr) -> Option<(LispExpr, u64, MatchBindings)> {
+        fn push_new_binding(binding: MatchBinding, ids: &mut Vec<MatchBinding>, curr_id: &mut u64) -> Option<LispExpr> {
+            ids.push(binding);
+            let id = *curr_id;
+            *curr_id += 1;
+            Some(LispExpr::Ident(id))
+        }
+
+        fn from_expr_impl(expr: &Expr, ids: &mut Vec<MatchBinding>, curr_id: &mut u64) -> Option<LispExpr> {
+            match expr.node {
+                ExprBinary(op, ref lhs, ref rhs) => {
+                    if let Some(lhs_expr) = from_expr_impl(lhs, ids, curr_id) {
+                        if let Some(rhs_expr) = from_expr_impl(rhs, ids, curr_id) {
+                            return Some(LispExpr::Binary(op.node, box lhs_expr, box rhs_expr));
+                        }
+                    }
+
+                    None
+                },
+                ExprField(ref expr, ref name) => {
+                    if let ExprPath(ref qualif, ref path) = expr.node {
+                        if let Some(pos) = ids.iter().position(|item| {
+                            if let MatchBinding::Field(ref bqualif, ref bpath, ref bname) = *item {
+                                bqualif == qualif
+                                && bpath.global == path.global
+                                && bpath.segments == path.segments
+                                && bname.node == name.node
+                            }
+                            else {
+                                false
+                            }
+                        }) {
+                            Some(LispExpr::Ident(pos as u64))
+                        }
+                        else {
+                            push_new_binding(MatchBinding::Field(qualif.clone(), path.clone(), name.clone()), ids, curr_id)
+                        }
+                    }
+                    else {
+                        push_new_binding(MatchBinding::Other(expr.span), ids, curr_id)
+                    }
+                },
+                ExprLit(ref lit) => {
+                    match lit.node {
+                        LitFloat(ref f, FloatTy::TyF64)
+                        | LitFloatUnsuffixed(ref f) => {
+                            if let Ok(f) = f.parse() {
+                                Some(LispExpr::Lit(f))
+                            }
+                            else {
+                                None
+                            }
+                        },
+                        _ => None
+                    }
+                },
+                ExprMethodCall(ref fun, ref ascripted_type, ref params) if ascripted_type.is_empty() => {
+                    let name = fun.node.as_str();
+
+                    if let Some(&(herbie_name, _, _)) = KNOWN_FUNS.iter().find(
+                        |&&(_, rust_name, num_params)| {
+                            rust_name == name && params.len() == num_params
+                        }
+                    ) {
+                        let mut lisp_params = Vec::new();
+                        for param in params {
+                            if let Some(lisp_expr) = from_expr_impl(param, ids, curr_id) {
+                                lisp_params.push(lisp_expr);
+                            }
+                            else {
+                                return None;
+                            }
+                        }
+                        Some(LispExpr::Fun(herbie_name.into(), lisp_params))
+                    }
+                    else {
+                        None
+                    }
+                },
+                ExprPath(ref qualif, ref path) => {
+                    if let Some(pos) = ids.iter().position(|item| {
+                        if let MatchBinding::Ident(ref bqualif, ref bpath) = *item {
+                            bqualif == qualif
+                            && bpath.global == path.global
+                            && bpath.segments == path.segments
+                        }
+                        else {
+                            false
+                        }
+                    }) {
+                        Some(LispExpr::Ident(pos as u64))
+                    }
+                    else {
+                        push_new_binding(MatchBinding::Ident(qualif.clone(), path.clone()), ids, curr_id)
+                    }
+                },
+                ExprTupField(ref tup, ref idx) => {
+                    if let ExprPath(ref qualif, ref path) = tup.node {
+                        if let Some(pos) = ids.iter().position(|item| {
+                            if let MatchBinding::TupField(ref bqualif, ref bpath, ref bidx) = *item {
+                                bqualif == qualif
+                                && bpath.global == path.global
+                                && bpath.segments == path.segments
+                                && bidx.node == idx.node
+                            }
+                            else {
+                                false
+                            }
+                        }) {
+                            Some(LispExpr::Ident(pos as u64))
+                        }
+                        else {
+                            push_new_binding(MatchBinding::TupField(qualif.clone(), path.clone(), idx.clone()), ids, curr_id)
+                        }
+                    }
+                    else {
+                        push_new_binding(MatchBinding::Other(expr.span), ids, curr_id)
+                    }
+                },
+                ExprUnary(op, ref expr) => {
+                    from_expr_impl(expr, ids, curr_id).map(|expr| LispExpr::Unary(op, box expr))
+                },
+                _ => None,
+            }
+        }
+
+        let mut ids = Vec::new();
+        let mut curr_id = 0;
+        from_expr_impl(expr, &mut ids, &mut curr_id).map(|expr| {
+            let bindings = ids.drain(..).enumerate().map(|(k, v)| (k as u64, v));
+            (expr, curr_id, MatchBindings { bindings: HashMap::from_iter(bindings) })
+        })
+    }
 
     pub fn match_expr(matchee: &Expr, other: &LispExpr) -> Option<MatchBindings> {
 
@@ -100,7 +237,7 @@ impl LispExpr {
                 },
                 (&ExprMethodCall(ref lfun, ref ascripted_type, ref lp), &LispExpr::Fun(ref rfun, ref rp)) if ascripted_type.is_empty() => {
                     let name = lfun.node.as_str();
-                    if let Some(&(herbie_name, _, _)) = KNOW_FUNS.iter().find(
+                    if let Some(&(herbie_name, _, _)) = KNOWN_FUNS.iter().find(
                         |&&(_, rust_name, num_params)| {
                             rust_name == name && lp.len() == num_params
                         }
@@ -213,7 +350,6 @@ impl LispExpr {
         }
     }
 
-    // TODO: should probably not be pub
     pub fn to_lisp(&self, placeholder: &str) -> String {
         match *self {
             LispExpr::Binary(op, ref lhs, ref rhs) => {
@@ -240,6 +376,26 @@ impl LispExpr {
             },
             LispExpr::Ident(id) => {
                 format!("{}{}", placeholder, id)
+            },
+        }
+    }
+
+    pub fn depth(&self) -> u64 {
+        match *self {
+            LispExpr::Binary(_, ref lhs, ref rhs) => {
+                1 + std::cmp::max(lhs.depth(), rhs.depth())
+            },
+            LispExpr::Fun(_, ref params) => {
+                1 + params.iter().map(Self::depth).max().unwrap_or(0)
+            },
+            LispExpr::Lit(_) => {
+                0
+            },
+            LispExpr::Unary(_, ref expr) => {
+                expr.depth()
+            },
+            LispExpr::Ident(_) => {
+                0
             },
         }
     }
@@ -371,6 +527,7 @@ impl Parser {
                     Some('-') => self.parse_op(it, BinOp_::BiSub),
                     Some('*') => self.parse_op(it, BinOp_::BiMul),
                     Some('/') => self.parse_op(it, BinOp_::BiDiv),
+                    Some('\u{3bb}') => self.parse_lambda(it),
                     Some(c) => {
                         self.put_back(c);
                         self.parse_fun(it)
@@ -452,6 +609,19 @@ impl Parser {
         }
     }
 
+    fn parse_lambda<It: Iterator<Item=char>>(&mut self, it: &mut It) -> Result<LispExpr, ParseError> {
+        loop {
+            match it.next() {
+                Some(')') | None => break,
+                _ => continue,
+            }
+        }
+
+        let r = self.parse_impl(it);
+        try!(self.expect(it, ')', true));
+        r
+    }
+
     fn parse_fun<It: Iterator<Item=char>>(&mut self, it: &mut It) -> Result<LispExpr, ParseError> {
         let mut buf = String::new();
         loop {
@@ -477,8 +647,8 @@ impl Parser {
             }
 
             try!(self.expect(it, ')', true));
-            if let Ok(idx) = KNOW_FUNS.binary_search_by(|p| p.0.cmp(&buf)) {
-                return if KNOW_FUNS[idx].2 == params.len() {
+            if let Ok(idx) = KNOWN_FUNS.binary_search_by(|p| p.0.cmp(&buf)) {
+                return if KNOWN_FUNS[idx].2 == params.len() {
                     Ok(LispExpr::Fun(buf, params))
                 }
                 else {
