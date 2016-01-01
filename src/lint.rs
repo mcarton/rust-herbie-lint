@@ -115,12 +115,12 @@ impl LateLintPass for Herbie {
 
         let conf = self.conf.as_ref().unwrap();
         if !got_match && conf.use_herbie != conf::UseHerbieConf::No {
-            try_with_herbie(cx, expr, &conf.herbie_seed);
+            try_with_herbie(cx, expr, &conf);
         }
     }
 }
 
-fn try_with_herbie(cx: &LateContext, expr: &Expr, seed: &str) {
+fn try_with_herbie(cx: &LateContext, expr: &Expr, conf: &conf::Conf) {
     let (lisp_expr, nb_ids, bindings) = match LispExpr::from_expr(expr) {
         Some(r) => r,
         None => return, // TODO: report
@@ -130,16 +130,28 @@ fn try_with_herbie(cx: &LateContext, expr: &Expr, seed: &str) {
         return;
     }
 
-    // TODO: link to wiki about Herbie.toml
-    cx.sess().diagnostic().span_note_without_error(expr.span, "Calling Herbie on the following expression, it might take a while");
-
-    let mut child = Command::new("herbie-inout")
+    let seed : &str = &conf.herbie_seed;
+    let mut command = Command::new("herbie-inout");
+    let command = command
         .arg("--seed").arg(seed)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .spawn()
-        .unwrap();
+    ;
+
+    let mut child = if let Ok(child) = command.spawn() {
+        child
+    }
+    else {
+        if conf.use_herbie == conf::UseHerbieConf::Yes {
+            // TODO: wiki
+            cx.span_lint(HERBIE, expr.span, "Could not call Herbie");
+        }
+        return
+    };
+
+    // TODO: link to wiki about Herbie.toml
+    cx.sess().diagnostic().span_note_without_error(expr.span, "Calling Herbie on the following expression, it might take a while");
 
     let params = (0..nb_ids).map(|id| format!("herbie{}", id)).join(" ");
     let lisp_expr = lisp_expr.to_lisp("herbie");
