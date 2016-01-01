@@ -5,19 +5,20 @@ use toml;
 
 const DEFAULT_HERBIE_SEED : &'static str = "#(1461197085 2376054483 1553562171 1611329376 2497620867 2308122621)";
 const DEFAULT_DB_PATH : &'static str = "Herbie.db";
-const DEFAULT_TIMEOUT : u64 = 120;
+const DEFAULT_TIMEOUT : u32 = 120;
 
 #[derive(Debug, RustcDecodable)]
 pub struct UxConf {
     /// Path to the database.
     pub db_path: Option<String>,
     /// Maximum time in seconds that Herbie is allowed to play with an expression. If null, allow
-    /// The seed use by Herbie. If not provided, a fixed seed will be used. Fixing the seed ensure
+    /// The seed use by Herbie. If not provided, a fixed seed will be used. Fixing the seed ensures
     /// deterministic builds.
     pub herbie_seed: Option<String>,
     /// Herbie to run indefinitely. Default is two minutes.
-    pub timeout: Option<u64>,
-    /// Allow the plugin to call Herbie on unknown expressions.
+    pub timeout: Option<u32>,
+    /// Allow the plugin to call Herbie on unknown expressions. Positive results from Herbie will
+    /// be cached in the database.
     /// If ‘true’, the plugin will fail if it cannot find the executable.
     /// If ‘false’, the plugin will not try to run Herbie.
     /// By default, the plugin will call the executable only if it's found, but won't complain
@@ -25,7 +26,7 @@ pub struct UxConf {
     pub use_herbie: Option<bool>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum UseHerbieConf {
     Default,
     No,
@@ -36,7 +37,7 @@ pub enum UseHerbieConf {
 pub struct Conf {
     pub db_path: Cow<'static, str>,
     pub herbie_seed: Cow<'static, str>,
-    pub timeout: Option<u64>,
+    pub timeout: Option<u32>,
     pub use_herbie: UseHerbieConf,
 }
 
@@ -87,7 +88,5 @@ pub fn read_conf() -> Conf {
     };
 
     let conf : UxConf = toml::decode_str(&conf).unwrap();
-    let conf = conf.into();
-    println!("{:?}", conf);
-    conf
+    conf.into()
 }
