@@ -131,7 +131,7 @@ fn try_with_herbie(cx: &LateContext, expr: &Expr, seed: &str) {
     }
 
     // TODO: link to wiki about Herbie.toml
-    cx.sess().span_note(expr.span, "Calling Herbie on the following expression, it might take a while");
+    cx.sess().diagnostic().span_note_without_error(expr.span, "Calling Herbie on the following expression, it might take a while");
 
     let mut child = Command::new("herbie-inout")
         .arg("--seed").arg(seed)
@@ -179,6 +179,7 @@ fn try_with_herbie(cx: &LateContext, expr: &Expr, seed: &str) {
 }
 
 fn report(cx: &LateContext, expr: &Expr, cmdout: &LispExpr, bindings: &lisp::MatchBindings) {
-    cx.span_lint(HERBIE, expr.span, "Numerically unstable expression");
-    cx.sess().span_suggestion(expr.span, "Try this", cmdout.to_rust(cx, &bindings));
+    cx.struct_span_lint(HERBIE, expr.span, "Numerically unstable expression")
+      .span_suggestion(expr.span, "Try this", cmdout.to_rust(cx, &bindings))
+      .emit();
 }
