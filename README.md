@@ -5,7 +5,8 @@
 This plugin can add warnings or errors to your crate when using a numerically
 instable floating point expression.
 
-Quick example of what you can get when compiling `test/compile-fail/test.rs`:
+Quick example of what you can get when compiling
+[`tests/compile-fail/general/test.rs`][example]:
 ```rust
 test.rs:40:5: 40:18 warning: Numerically unstable expression, #[warn(herbie)] on by default
 test.rs:40     (a/b + c) * b;
@@ -46,7 +47,7 @@ and in your crate:
 
 ```rust
 #![feature(plugin)]
-#![plugin(clippy)]
+#![plugin(herbie_lint)]
 ```
 
 See [*clippy*][clippy]'s [*Usage* section][clippy-usage] if you want to know
@@ -56,6 +57,7 @@ more and if you want more Rust lints.
 [clippy]: https://github.com/Manishearth/rust-clippy
 [crate-svg]: https://img.shields.io/crates/v/herbie-lint.svg
 [crate]: https://crates.io/crates/herbie-lint/
+[example]: https://github.com/mcarton/rust-herbie-lint/blob/master/tests/compile-fail/general/test.rs
 [ghc-herbie-db]: https://github.com/mikeizbicki/HerbiePlugin/blob/master/data/Herbie.db?raw=true
 [ghc-herbie]: https://github.com/mikeizbicki/HerbiePlugin
 [license-svg]: https://img.shields.io/crates/l/herbie-lint.svg
