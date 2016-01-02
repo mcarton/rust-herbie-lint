@@ -103,6 +103,7 @@ impl LateLintPass for Herbie {
                 cx.krate.span,
                 &format!("Got SQL error: {}", err)
             );
+            return;
         }
 
         let mut got_match = false;
