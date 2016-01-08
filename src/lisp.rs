@@ -57,6 +57,14 @@ const KNOWN_FUNS : &'static [(&'static str, &'static str, usize)] = &[
     ("tanh",  "tanh",   1),
 ];
 
+fn herbie_name(rust_name: &str, nb_params: usize) -> Option<&'static str> {
+    KNOWN_FUNS.iter().find(
+        |&&(_, name, params)| {
+            rust_name == name && nb_params == params
+        }
+    ).map(|t| t.0)
+}
+
 #[derive(Debug)]
 enum MatchBinding {
     Field(Option<QSelf>, Path, Spanned<Name>),
@@ -132,11 +140,7 @@ impl LispExpr {
                 ExprMethodCall(ref fun, ref ascripted_type, ref params) if ascripted_type.is_empty() => {
                     let name = fun.node.as_str();
 
-                    if let Some(&(herbie_name, _, _)) = KNOWN_FUNS.iter().find(
-                        |&&(_, rust_name, num_params)| {
-                            rust_name == name && params.len() == num_params
-                        }
-                    ) {
+                    if let Some(herbie_name) = herbie_name(&name, params.len()) {
                         let mut lisp_params = Vec::new();
                         for param in params {
                             if let Some(lisp_expr) = from_expr_impl(param, ids, curr_id) {
@@ -237,11 +241,7 @@ impl LispExpr {
                 },
                 (&ExprMethodCall(ref lfun, ref ascripted_type, ref lp), &LispExpr::Fun(ref rfun, ref rp)) if ascripted_type.is_empty() => {
                     let name = lfun.node.as_str();
-                    if let Some(&(herbie_name, _, _)) = KNOWN_FUNS.iter().find(
-                        |&&(_, rust_name, num_params)| {
-                            rust_name == name && lp.len() == num_params
-                        }
-                    ) {
+                    if let Some(herbie_name) = herbie_name(&name, lp.len()) {
                         herbie_name == rfun
                         && lp.iter().zip(rp).all(|(lp, rp)| match_expr_impl(lp, rp, ids))
                     }
@@ -479,7 +479,7 @@ impl LispExpr {
 
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ParseError {
     Arity,
     Expected(char),
@@ -489,6 +489,7 @@ pub enum ParseError {
     EOE,
 }
 
+#[derive(Debug)]
 pub struct Parser {
     ids: Vec<String>,
     stack: Vec<char>,
@@ -523,10 +524,10 @@ impl Parser {
         match self.get_char(it, true) {
             Some('(') => {
                 match self.get_char(it, true) {
-                    Some('+') => self.parse_op(it, BinOp_::BiAdd),
-                    Some('-') => self.parse_op(it, BinOp_::BiSub),
-                    Some('*') => self.parse_op(it, BinOp_::BiMul),
-                    Some('/') => self.parse_op(it, BinOp_::BiDiv),
+                    Some('+') => self.parse_op(it, BiAdd),
+                    Some('-') => self.parse_op(it, BiSub),
+                    Some('*') => self.parse_op(it, BiMul),
+                    Some('/') => self.parse_op(it, BiDiv),
                     Some('\u{3bb}') => self.parse_lambda(it),
                     Some(c) => {
                         self.put_back(c);
@@ -656,7 +657,7 @@ impl Parser {
                 }
             }
             else if buf == "sqr" && params.len() == 1 {
-                return Ok(LispExpr::Binary(BinOp_::BiMul, box params[0].clone(), box params.remove(0)))
+                return Ok(LispExpr::Binary(BiMul, box params[0].clone(), box params.remove(0)))
             }
         }
 
@@ -670,8 +671,8 @@ impl Parser {
         let r = if let Ok(rhs) = self.parse_impl(it) {
             Ok(LispExpr::Binary(op, box lhs, box rhs))
         }
-        else if op == BinOp_::BiSub {
-            Ok(LispExpr::Unary(UnOp::UnNeg, box lhs))
+        else if op == BiSub {
+            Ok(LispExpr::Unary(UnNeg, box lhs))
         }
         else {
             return Err(ParseError::Arity);
