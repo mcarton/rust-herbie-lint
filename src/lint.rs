@@ -116,19 +116,22 @@ impl LateLintPass for Herbie {
 
         let conf = self.conf.as_ref().unwrap();
         if !got_match && conf.use_herbie != conf::UseHerbieConf::No {
-            try_with_herbie(cx, expr, &conf);
+            if let Err(err) = try_with_herbie(cx, expr, &conf) {
+                cx.span_lint(HERBIE, expr.span, err)
+            }
         }
     }
 }
 
-fn try_with_herbie(cx: &LateContext, expr: &Expr, conf: &conf::Conf) {
+fn try_with_herbie(cx: &LateContext, expr: &Expr, conf: &conf::Conf) -> Result<(), &'static str> {
     let (lisp_expr, nb_ids, bindings) = match LispExpr::from_expr(expr) {
         Some(r) => r,
-        None => return, // TODO: report
+        // not an error, the expression might for example contain a function unknown to Herbie
+        None => return Ok(()),
     };
 
     if lisp_expr.depth() <= 2 {
-        return;
+        return Ok(())
     }
 
     let seed : &str = &conf.herbie_seed;
@@ -144,11 +147,13 @@ fn try_with_herbie(cx: &LateContext, expr: &Expr, conf: &conf::Conf) {
         child
     }
     else {
-        if conf.use_herbie == conf::UseHerbieConf::Yes {
+        return if conf.use_herbie == conf::UseHerbieConf::Yes {
             // TODO: wiki
-            cx.span_lint(HERBIE, expr.span, "Could not call Herbie");
+            Err("Could not call Herbie")
         }
-        return
+        else {
+            Ok(())
+        }
     };
 
     // TODO: link to wiki about Herbie.toml
@@ -158,7 +163,9 @@ fn try_with_herbie(cx: &LateContext, expr: &Expr, conf: &conf::Conf) {
     let lisp_expr = lisp_expr.to_lisp("herbie");
     let lisp_expr = format!("(lambda ({}) {})\n", params, lisp_expr);
     let lisp_expr = lisp_expr.as_bytes();
-    child.stdin.as_mut().unwrap().write(lisp_expr).unwrap();
+    child.stdin
+        .as_mut().expect("Herbie-inout's stdin not captured")
+        .write(lisp_expr).expect("Could not write on herbie-inout's stdin");
 
     let output = if let Ok(output) = child.wait_with_output() {
         if output.status.success() {
@@ -166,29 +173,51 @@ fn try_with_herbie(cx: &LateContext, expr: &Expr, conf: &conf::Conf) {
                 output.to_owned()
             }
             else {
-                return
+                return Err("herbie-inout returned non-utf8")
             }
         }
         else {
-            return
+            return Err("herbie-inout did not return successfully")
         }
     }
     else {
-        return
+        return Err("herbie-inout failed")
     };
 
     let mut output = output.lines();
-    let errin = output.next().unwrap().split(' ').last().unwrap().parse::<f64>().unwrap();
-    let errout = output.next().unwrap().split(' ').last().unwrap().parse::<f64>().unwrap();
+
+    fn parse_error(s: Option<&str>) -> Option<f64> {
+        match s {
+            Some(s) => match s.split(' ').last().map(str::parse::<f64>) {
+                Some(Ok(f)) => Some(f),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    let (errin, errout, cmdout) = match (parse_error(output.next()), parse_error(output.next()), output.next()) {
+        (Some(errin), Some(errout), Some(cmdout)) => {
+            (errin, errout, cmdout)
+        }
+        _ => {
+            return Err("Could not parse herbie-inout output")
+        }
+    };
+
 
     if errin <= errout {
-        return
+        return Ok(())
     }
 
     let mut parser = lisp::Parser::new();
-    let cmdout = parser.parse(&output.next().unwrap()).unwrap();
+    let cmdout = match parser.parse(cmdout) {
+        Ok(cmdout) => cmdout,
+        _ => return Err("Could not understand herbie-inout cmdout"),
+    };
 
     report(cx, expr, &cmdout, &bindings);
+    Ok(())
 }
 
 fn report(cx: &LateContext, expr: &Expr, cmdout: &LispExpr, bindings: &lisp::MatchBindings) {
