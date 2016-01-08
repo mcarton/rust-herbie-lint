@@ -6,6 +6,7 @@ use rusqlite as sql;
 use rustc::lint::{LateContext, LintArray, LintContext, LintPass, LateLintPass};
 use rustc::middle::ty::TypeVariants;
 use rustc_front::hir::*;
+use std;
 use std::io::Write;
 use std::process::{Command, Stdio};
 use std::str::from_utf8;
@@ -18,6 +19,39 @@ pub struct Herbie {
     subs: Vec<(LispExpr, LispExpr)>,
 }
 
+#[derive(Debug)]
+pub enum InitError {
+    ConfError { error: conf::ConfError },
+    SQLError { error: sql::Error },
+}
+
+impl From<conf::ConfError> for InitError {
+
+    fn from(err: conf::ConfError) -> InitError {
+        InitError::ConfError { error: err }
+    }
+
+}
+
+impl From<sql::Error> for InitError {
+
+    fn from(err: sql::Error) -> InitError {
+        InitError::SQLError { error: err }
+    }
+
+}
+
+impl std::fmt::Display for InitError {
+
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        match *self {
+            InitError::ConfError { ref error } => write!(f, "Configuration error: {}", error),
+            InitError::SQLError { ref error } => write!(f, "Got SQL error: {}", error),
+        }
+    }
+
+}
+
 impl Herbie {
 
     pub fn new() -> Herbie {
@@ -28,14 +62,14 @@ impl Herbie {
         }
     }
 
-    pub fn init(&mut self) -> Result<(), sql::Error> {
+    pub fn init(&mut self) -> Result<(), InitError> {
         if self.initialized {
             return Ok(())
         }
 
         self.initialized = true;
 
-        let conf = conf::read_conf();
+        let conf = try!(conf::read_conf());
         let conn = try!(sql::Connection::open_with_flags(
             conf.db_path.as_ref(), sql::SQLITE_OPEN_READ_ONLY
         ));
@@ -101,7 +135,7 @@ impl LateLintPass for Herbie {
                 cx.krate.span,
                 "Could not initialize Herbie-Lint",
                 cx.krate.span,
-                &format!("Got SQL error: {}", err)
+                &err.to_string()
             );
             return;
         }
@@ -114,7 +148,7 @@ impl LateLintPass for Herbie {
             }
         }
 
-        let conf = self.conf.as_ref().unwrap();
+        let conf = self.conf.as_ref().expect("Configuration should be read by now");
         if !got_match && conf.use_herbie != conf::UseHerbieConf::No {
             if let Err(err) = try_with_herbie(cx, expr, &conf) {
                 cx.span_lint(HERBIE, expr.span, err)

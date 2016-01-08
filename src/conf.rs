@@ -1,6 +1,7 @@
+use std;
 use std::borrow::Cow;
 use std::fs::File;
-use std::io::Read;
+use std::io::{Error as IOError, Read};
 use toml;
 
 const DEFAULT_HERBIE_SEED : &'static str = "#(1461197085 2376054483 1553562171 1611329376 2497620867 2308122621)";
@@ -74,19 +75,44 @@ impl From<UxConf> for Conf {
 
 }
 
-pub fn read_conf() -> Conf {
-    let conf = {
-        let mut conf = if let Ok(conf) = File::open("Herbie.toml") {
-            conf
+#[derive(Debug)]
+pub enum ConfError {
+    IOError { error: IOError },
+    ParseError,
+}
+
+impl std::fmt::Display for ConfError {
+
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        match *self {
+            ConfError::IOError{ ref error } => write!(f, "Error reading Herbie.toml: {}", error),
+            ConfError::ParseError => write!(f, "Syntax error in Herbie.toml"),
+        }
+    }
+
+}
+
+impl From<IOError> for ConfError {
+
+    fn from(err: IOError) -> ConfError {
+        ConfError::IOError { error: err }
+    }
+
+}
+
+pub fn read_conf() -> Result<Conf, ConfError> {
+    if let Ok(mut conf) = File::open("Herbie.toml") {
+        let mut buffer = String::new();
+        try!(conf.read_to_string(&mut buffer));
+
+        if let Some(conf) = toml::decode_str::<UxConf>(&buffer) {
+            Ok(conf.into())
         }
         else {
-            return Conf::default();
-        };
-        let mut buffer = String::new();
-        conf.read_to_string(&mut buffer).unwrap();
-        buffer
-    };
-
-    let conf : UxConf = toml::decode_str(&conf).unwrap();
-    conf.into()
+            Err(ConfError::ParseError)
+        }
+    }
+    else {
+        Ok(Conf::default())
+    }
 }
