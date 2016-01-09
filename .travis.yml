@@ -6,6 +6,28 @@ addons:
     apt:
         packages:
             - sqlite3
+            # for kcov:
+            - binutils-dev
+            - libcurl4-openssl-dev
+            - libdw-dev
+            - libelf-dev
 
 script:
     RUST_BACKTRACE= cargo test --features=clippy
+
+before_script:
+    wget 'https://github.com/mikeizbicki/HerbiePlugin/blob/master/data/Herbie.db?raw=true' -O Herbie.db
+
+script:
+    cargo test --features=clippy
+
+# copied from https://github.com/hyperium/hyper/blob/d2e9c94cf56c0eb92275557bf3926afeb82e4d3d/.travis.yml#L35
+after_success: |
+    RUST_BACKTRACE= pip install 'travis-cargo<0.2' --user &&
+    export PATH=$HOME/.local/bin:$PATH &&
+    export LD_LIBRARY_PATH=target/debug/:$LD_LIBRARY_PATH &&
+    travis-cargo coveralls --no-sudo --verify
+
+env:
+    global:
+        - TRAVIS_CARGO_NIGHTLY_FEATURE=""
