@@ -7,6 +7,7 @@ use rustc::lint::{LateContext, LintArray, LintContext, LintPass, LateLintPass};
 use rustc::middle::ty::TypeVariants;
 use rustc_front::hir::*;
 use std;
+use std::borrow::Cow;
 use std::io::Write;
 use std::process::{Command, Stdio};
 use std::str::from_utf8;
@@ -151,13 +152,13 @@ impl LateLintPass for Herbie {
         let conf = self.conf.as_ref().expect("Configuration should be read by now");
         if !got_match && conf.use_herbie != conf::UseHerbieConf::No {
             if let Err(err) = try_with_herbie(cx, expr, &conf) {
-                cx.span_lint(HERBIE, expr.span, err)
+                cx.span_lint(HERBIE, expr.span, &err);
             }
         }
     }
 }
 
-fn try_with_herbie(cx: &LateContext, expr: &Expr, conf: &conf::Conf) -> Result<(), &'static str> {
+fn try_with_herbie(cx: &LateContext, expr: &Expr, conf: &conf::Conf) -> Result<(), Cow<'static, str>> {
     let (lisp_expr, nb_ids, bindings) = match LispExpr::from_expr(expr) {
         Some(r) => r,
         // not an error, the expression might for example contain a function unknown to Herbie
@@ -172,6 +173,7 @@ fn try_with_herbie(cx: &LateContext, expr: &Expr, conf: &conf::Conf) -> Result<(
     let mut command = Command::new("herbie-inout");
     let command = command
         .arg("--seed").arg(seed)
+        .arg("-o").arg("rules:numerics")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -183,7 +185,7 @@ fn try_with_herbie(cx: &LateContext, expr: &Expr, conf: &conf::Conf) -> Result<(
     else {
         return if conf.use_herbie == conf::UseHerbieConf::Yes {
             // TODO: wiki
-            Err("Could not call Herbie")
+            Err("Could not call Herbie".into())
         }
         else {
             Ok(())
@@ -194,8 +196,8 @@ fn try_with_herbie(cx: &LateContext, expr: &Expr, conf: &conf::Conf) -> Result<(
     cx.sess().diagnostic().span_note_without_error(expr.span, "Calling Herbie on the following expression, it might take a while");
 
     let params = (0..nb_ids).map(|id| format!("herbie{}", id)).join(" ");
-    let lisp_expr = lisp_expr.to_lisp("herbie");
-    let lisp_expr = format!("(lambda ({}) {})\n", params, lisp_expr);
+    let cmdin = lisp_expr.to_lisp("herbie");
+    let lisp_expr = format!("(lambda ({}) {})\n", params, cmdin);
     let lisp_expr = lisp_expr.as_bytes();
     child.stdin
         .as_mut().expect("Herbie-inout's stdin not captured")
@@ -207,15 +209,15 @@ fn try_with_herbie(cx: &LateContext, expr: &Expr, conf: &conf::Conf) -> Result<(
                 output.to_owned()
             }
             else {
-                return Err("herbie-inout returned non-utf8")
+                return Err("herbie-inout returned non-utf8".into())
             }
         }
         else {
-            return Err("herbie-inout did not return successfully")
+            return Err("herbie-inout did not return successfully".into())
         }
     }
     else {
-        return Err("herbie-inout failed")
+        return Err("herbie-inout failed".into())
     };
 
     let mut output = output.lines();
@@ -235,7 +237,7 @@ fn try_with_herbie(cx: &LateContext, expr: &Expr, conf: &conf::Conf) -> Result<(
             (errin, errout, cmdout)
         }
         _ => {
-            return Err("Could not parse herbie-inout output")
+            return Err("Could not parse herbie-inout output".into())
         }
     };
 
@@ -247,15 +249,32 @@ fn try_with_herbie(cx: &LateContext, expr: &Expr, conf: &conf::Conf) -> Result<(
     let mut parser = lisp::Parser::new();
     let cmdout = match parser.parse(cmdout) {
         Ok(cmdout) => cmdout,
-        _ => return Err("Could not understand herbie-inout cmdout"),
+        _ => return Err("Could not understand herbie-inout cmdout".into()),
     };
 
     report(cx, expr, &cmdout, &bindings);
-    Ok(())
+    save(conf, &cmdin, &cmdout, "", errin, errout).map_err(|err| format!("Could not save database, got SQL error {}", err).into())
 }
 
 fn report(cx: &LateContext, expr: &Expr, cmdout: &LispExpr, bindings: &lisp::MatchBindings) {
     cx.struct_span_lint(HERBIE, expr.span, "Numerically unstable expression")
       .span_suggestion(expr.span, "Try this", cmdout.to_rust(cx, &bindings))
       .emit();
+}
+
+fn save(
+    conf: &conf::Conf,
+    cmdin: &str, cmdout: &LispExpr,
+    seed: &str,
+    errin: f64, errout: f64
+) -> Result<(), sql::Error> {
+    let conn = try!(sql::Connection::open_with_flags(
+        conf.db_path.as_ref(), sql::SQLITE_OPEN_READ_WRITE
+    ));
+
+    try!(conn.execute("INSERT INTO HerbieResults (cmdin, cmdout, opts, errin, errout)
+                       VALUES ($1, $2, $3, $4, $5)",
+                       &[&cmdin, &cmdout.to_lisp("herbie"), &seed, &errin, &errout]));
+
+    Ok(())
 }
