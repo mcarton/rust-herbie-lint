@@ -29,6 +29,7 @@ As you can see, it will report numerically instable expressions, and suggest a
 (sometimes over-parenthesized) more stable correction.
 
 ## Usage
+### Plugin
 This is a `rustc` plugin, to use it, you need a *nightly* Rust.
 
 You need a database of possible corrections for this plugin to work. The
@@ -52,6 +53,23 @@ and in your crate:
 
 See [*clippy*][clippy]'s [*Usage* section][clippy-usage] if you want to know
 more and if you want more Rust lints.
+
+### Configuration
+If you don't want the plugin to lint a particular function or method, you can
+mark it with the `#[herbie_ignore]` attribute:
+
+```rust
+fn foo(a: f64, b: f64, c: f64) -> f64 {
+    (a/b + c) * b
+    // This will suggest to use “(c * b) + a” instead.
+}
+
+#[herbie_ignore]
+fn bar(a: f64, b: f64, c: f64) -> f64 {
+    (a/b + c) * b
+    // This won't.
+}
+```
 
 [clippy-usage]: https://github.com/Manishearth/rust-clippy#usage
 [clippy]: https://github.com/Manishearth/rust-clippy
