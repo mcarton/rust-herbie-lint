@@ -2,5 +2,10 @@ language: rust
 rust:
   - nightly
 
+addons:
+    apt:
+        packages:
+            - sqlite3
+
 script:
-    cargo test --features=clippy
+    RUST_BACKTRACE= cargo test --features=clippy
