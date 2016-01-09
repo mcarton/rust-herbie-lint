@@ -22,39 +22,36 @@ pub struct Herbie {
 
 #[derive(Debug)]
 pub enum InitError {
-    ConfError { error: conf::ConfError },
-    SQLError { error: sql::Error },
+    ConfError {
+        error: conf::ConfError,
+    },
+    SQLError {
+        error: sql::Error,
+    },
 }
 
 impl From<conf::ConfError> for InitError {
-
     fn from(err: conf::ConfError) -> InitError {
         InitError::ConfError { error: err }
     }
-
 }
 
 impl From<sql::Error> for InitError {
-
     fn from(err: sql::Error) -> InitError {
         InitError::SQLError { error: err }
     }
-
 }
 
 impl std::fmt::Display for InitError {
-
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         match *self {
             InitError::ConfError { ref error } => write!(f, "Configuration error: {}", error),
             InitError::SQLError { ref error } => write!(f, "Got SQL error: {}", error),
         }
     }
-
 }
 
 impl Herbie {
-
     pub fn new() -> Herbie {
         Herbie {
             conf: None,
@@ -166,10 +163,10 @@ fn try_with_herbie(cx: &LateContext, expr: &Expr, conf: &conf::Conf) -> Result<(
     };
 
     if lisp_expr.depth() <= 2 {
-        return Ok(())
+        return Ok(());
     }
 
-    let seed : &str = &conf.herbie_seed;
+    let seed: &str = &conf.herbie_seed;
     let mut command = Command::new("herbie-inout");
     let command = command
         .arg("--seed").arg(seed)
@@ -188,12 +185,15 @@ fn try_with_herbie(cx: &LateContext, expr: &Expr, conf: &conf::Conf) -> Result<(
             }
             else {
                 Ok(())
-            }
+            };
         }
     };
 
     // TODO: link to wiki about Herbie.toml
-    cx.sess().diagnostic().span_note_without_error(expr.span, "Calling Herbie on the following expression, it might take a while");
+    cx.sess().diagnostic().span_note_without_error(
+        expr.span,
+        "Calling Herbie on the following expression, it might take a while"
+    );
 
     let params = (0..nb_ids).map(|id| format!("herbie{}", id)).join(" ");
     let cmdin = lisp_expr.to_lisp("herbie");
@@ -201,7 +201,8 @@ fn try_with_herbie(cx: &LateContext, expr: &Expr, conf: &conf::Conf) -> Result<(
     let lisp_expr = lisp_expr.as_bytes();
     child.stdin
         .as_mut().expect("Herbie-inout's stdin not captured")
-        .write(lisp_expr).expect("Could not write on herbie-inout's stdin");
+        .write(lisp_expr).expect("Could not write on herbie-inout's stdin")
+    ;
 
     let output = if let Ok(output) = child.wait_with_output() {
         if output.status.success() {
@@ -209,25 +210,27 @@ fn try_with_herbie(cx: &LateContext, expr: &Expr, conf: &conf::Conf) -> Result<(
                 output.to_owned()
             }
             else {
-                return Err("herbie-inout returned non-utf8".into())
+                return Err("herbie-inout returned non-utf8".into());
             }
         }
         else {
-            return Err("herbie-inout did not return successfully".into())
+            return Err("herbie-inout did not return successfully".into());
         }
     }
     else {
-        return Err("herbie-inout failed".into())
+        return Err("herbie-inout failed".into());
     };
 
     let mut output = output.lines();
 
     fn parse_error(s: Option<&str>) -> Option<f64> {
         match s {
-            Some(s) => match s.split(' ').last().map(str::parse::<f64>) {
-                Some(Ok(f)) => Some(f),
-                _ => None,
-            },
+            Some(s) => {
+                match s.split(' ').last().map(str::parse::<f64>) {
+                    Some(Ok(f)) => Some(f),
+                    _ => None,
+                }
+            }
             _ => None,
         }
     }
@@ -243,7 +246,7 @@ fn try_with_herbie(cx: &LateContext, expr: &Expr, conf: &conf::Conf) -> Result<(
 
 
     if errin <= errout {
-        return Ok(())
+        return Ok(());
     }
 
     let mut parser = lisp::Parser::new();
@@ -253,7 +256,8 @@ fn try_with_herbie(cx: &LateContext, expr: &Expr, conf: &conf::Conf) -> Result<(
     };
 
     report(cx, expr, &cmdout, &bindings);
-    save(conf, &cmdin, &cmdout, "", errin, errout).map_err(|err| format!("Could not save database, got SQL error {}", err).into())
+    save(conf, &cmdin, &cmdout, "", errin, errout)
+        .map_err(|err| format!("Could not save database, got SQL error {}", err).into())
 }
 
 fn report(cx: &LateContext, expr: &Expr, cmdout: &LispExpr, bindings: &lisp::MatchBindings) {

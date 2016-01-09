@@ -22,11 +22,9 @@ pub enum LispExpr {
 }
 
 impl std::fmt::Debug for LispExpr {
-
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         f.pad(&self.to_lisp("$"))
     }
-
 }
 
 /// List (herbie_name, rust_name).
@@ -58,11 +56,9 @@ const KNOWN_FUNS : &'static [(&'static str, &'static str, usize)] = &[
 ];
 
 fn herbie_name(rust_name: &str, nb_params: usize) -> Option<&'static str> {
-    KNOWN_FUNS.iter().find(
-        |&&(_, name, params)| {
-            rust_name == name && nb_params == params
-        }
-    ).map(|t| t.0)
+    KNOWN_FUNS.iter()
+              .find(|&&(_, name, params)| rust_name == name && nb_params == params)
+              .map(|t| t.0)
 }
 
 #[derive(Debug)]
@@ -76,20 +72,27 @@ enum MatchBinding {
 
 #[derive(Debug)]
 pub struct MatchBindings {
-    bindings: HashMap<u64, MatchBinding>
+    bindings: HashMap<u64, MatchBinding>,
 }
 
 impl LispExpr {
-
     pub fn from_expr(expr: &Expr) -> Option<(LispExpr, u64, MatchBindings)> {
-        fn push_new_binding(binding: MatchBinding, ids: &mut Vec<MatchBinding>, curr_id: &mut u64) -> Option<LispExpr> {
+        fn push_new_binding(
+            binding: MatchBinding,
+            ids: &mut Vec<MatchBinding>,
+            curr_id: &mut u64
+        ) -> Option<LispExpr> {
             ids.push(binding);
             let id = *curr_id;
             *curr_id += 1;
             Some(LispExpr::Ident(id))
         }
 
-        fn from_expr_impl(expr: &Expr, ids: &mut Vec<MatchBinding>, curr_id: &mut u64) -> Option<LispExpr> {
+        fn from_expr_impl(
+            expr: &Expr,
+            ids: &mut Vec<MatchBinding>,
+            curr_id: &mut u64
+        ) -> Option<LispExpr> {
             match expr.node {
                 ExprBinary(op, ref lhs, ref rhs) => {
                     if let Some(lhs_expr) = from_expr_impl(lhs, ids, curr_id) {
@@ -99,7 +102,7 @@ impl LispExpr {
                     }
 
                     None
-                },
+                }
                 ExprField(ref expr, ref name) => {
                     if let ExprPath(ref qualif, ref path) = expr.node {
                         if let Some(pos) = ids.iter().position(|item| {
@@ -122,21 +125,16 @@ impl LispExpr {
                     else {
                         push_new_binding(MatchBinding::Other(expr.span), ids, curr_id)
                     }
-                },
+                }
                 ExprLit(ref lit) => {
                     match lit.node {
                         LitFloat(ref f, FloatTy::TyF64)
                         | LitFloatUnsuffixed(ref f) => {
-                            if let Ok(f) = f.parse() {
-                                Some(LispExpr::Lit(f))
-                            }
-                            else {
-                                None
-                            }
-                        },
-                        _ => None
+                            f.parse().ok().map(LispExpr::Lit)
+                        }
+                        _ => None,
                     }
-                },
+                }
                 ExprMethodCall(ref fun, ref ascripted_type, ref params) if ascripted_type.is_empty() => {
                     let name = fun.node.as_str();
 
@@ -155,7 +153,7 @@ impl LispExpr {
                     else {
                         None
                     }
-                },
+                }
                 ExprPath(ref qualif, ref path) => {
                     if let Some(pos) = ids.iter().position(|item| {
                         if let MatchBinding::Ident(ref bqualif, ref bpath) = *item {
@@ -195,10 +193,10 @@ impl LispExpr {
                     else {
                         push_new_binding(MatchBinding::Other(expr.span), ids, curr_id)
                     }
-                },
+                }
                 ExprUnary(op, ref expr) => {
                     from_expr_impl(expr, ids, curr_id).map(|expr| LispExpr::Unary(op, box expr))
-                },
+                }
                 _ => None,
             }
         }
@@ -213,7 +211,11 @@ impl LispExpr {
 
     pub fn match_expr(matchee: &Expr, other: &LispExpr) -> Option<MatchBindings> {
 
-        fn match_expr_impl(lhs: &Expr, rhs: &LispExpr, ids: &mut HashMap<u64, MatchBinding>) -> bool {
+        fn match_expr_impl(
+            lhs: &Expr,
+            rhs: &LispExpr,
+            ids: &mut HashMap<u64, MatchBinding>
+        ) -> bool {
             fn bind_unknown(rid: u64, span: Span, ids: &mut HashMap<u64, MatchBinding>) -> bool {
                 if let Entry::Vacant(vacant) = ids.entry(rid) {
                     vacant.insert(MatchBinding::Other(span));
@@ -229,7 +231,10 @@ impl LispExpr {
                   Vac: FnOnce() -> MatchBinding {
                 match ids.entry(rid) {
                     Entry::Occupied(entry) => occ(entry.get()),
-                    Entry::Vacant(vacant) => { vacant.insert(vac()); true },
+                    Entry::Vacant(vacant) => {
+                        vacant.insert(vac());
+                        true
+                    }
                 }
             }
 
@@ -248,7 +253,7 @@ impl LispExpr {
                     else {
                         false
                     }
-                },
+                }
                 (&ExprPath(ref qualif, ref path), &LispExpr::Ident(rid)) => {
                     try_insert(rid, ids, |entry| {
                         if let MatchBinding::Ident(ref bqualif, ref bpath) = *entry {
@@ -262,15 +267,15 @@ impl LispExpr {
                     }, || {
                         MatchBinding::Ident(qualif.clone(), path.clone())
                     })
-                },
+                }
                 (&ExprLit(ref lit), &LispExpr::Lit(r)) => {
                     match lit.node {
                         LitFloat(ref f, FloatTy::TyF64) | LitFloatUnsuffixed(ref f) => {
                             f.parse() == Ok(r)
-                        },
-                        _ => false
+                        }
+                        _ => false,
                     }
-                },
+                }
                 (&ExprLit(ref expr), &LispExpr::Ident(rid)) => {
                     match expr.node {
                         LitFloat(ref lit, FloatTy::TyF64) | LitFloatUnsuffixed(ref lit) => {
@@ -289,13 +294,13 @@ impl LispExpr {
                             else {
                                 bind_unknown(rid, lhs.span, ids)
                             }
-                        },
-                        _ => bind_unknown(rid, lhs.span, ids)
+                        }
+                        _ => bind_unknown(rid, lhs.span, ids),
                     }
-                },
+                }
                 (&ExprUnary(lop, ref lp), &LispExpr::Unary(rop, ref rp)) => {
                     lop == rop && match_expr_impl(lp, rp, ids)
-                },
+                }
                 (&ExprTupField(ref tup, ref idx), &LispExpr::Ident(rid)) => {
                     if let ExprPath(ref qualif, ref path) = tup.node {
                         return try_insert(rid, ids, |entry| {
@@ -314,7 +319,7 @@ impl LispExpr {
                     }
 
                     bind_unknown(rid, lhs.span, ids)
-                },
+                }
                 (&ExprField(ref expr, ref name), &LispExpr::Ident(rid)) => {
                     if let ExprPath(ref qualif, ref path) = expr.node {
                         return try_insert(rid, ids, |entry| {
@@ -333,10 +338,8 @@ impl LispExpr {
                     }
 
                     bind_unknown(rid, lhs.span, ids)
-                },
-                (_, &LispExpr::Ident(rid)) => {
-                    bind_unknown(rid, lhs.span, ids)
-                },
+                }
+                (_, &LispExpr::Ident(rid)) => bind_unknown(rid, lhs.span, ids),
                 _ => false,
             }
         }
@@ -353,8 +356,13 @@ impl LispExpr {
     pub fn to_lisp(&self, placeholder: &str) -> String {
         match *self {
             LispExpr::Binary(op, ref lhs, ref rhs) => {
-                format!("({} {} {})", binop_to_string(op), lhs.to_lisp(placeholder), rhs.to_lisp(placeholder))
-            },
+                format!(
+                    "({} {} {})",
+                    binop_to_string(op),
+                    lhs.to_lisp(placeholder),
+                    rhs.to_lisp(placeholder)
+                )
+            }
             LispExpr::Fun(ref name, ref params) => {
                 let mut buf = String::new();
                 buf.push('(');
@@ -367,58 +375,48 @@ impl LispExpr {
 
                 buf.push(')');
                 buf
-            },
-            LispExpr::Lit(f) => {
-                format!("{}", f)
-            },
+            }
+            LispExpr::Lit(f) => format!("{}", f),
             LispExpr::Unary(op, ref expr) => {
                 format!("({} {})", unop_to_string(op), expr.to_lisp(placeholder))
-            },
-            LispExpr::Ident(id) => {
-                format!("{}{}", placeholder, id)
-            },
+            }
+            LispExpr::Ident(id) => format!("{}{}", placeholder, id),
         }
     }
 
     pub fn depth(&self) -> u64 {
         match *self {
-            LispExpr::Binary(_, ref lhs, ref rhs) => {
-                1 + std::cmp::max(lhs.depth(), rhs.depth())
-            },
-            LispExpr::Fun(_, ref params) => {
-                1 + params.iter().map(Self::depth).max().unwrap_or(0)
-            },
-            LispExpr::Lit(_) => {
-                0
-            },
-            LispExpr::Unary(_, ref expr) => {
-                expr.depth()
-            },
-            LispExpr::Ident(_) => {
-                0
-            },
+            LispExpr::Binary(_, ref lhs, ref rhs) => 1 + std::cmp::max(lhs.depth(), rhs.depth()),
+            LispExpr::Fun(_, ref params) => 1 + params.iter().map(Self::depth).max().unwrap_or(0),
+            LispExpr::Lit(_) => 0,
+            LispExpr::Unary(_, ref expr) => expr.depth(),
+            LispExpr::Ident(_) => 0,
         }
     }
 
     pub fn to_rust(&self, cx: &LateContext, bindings: &MatchBindings) -> String {
-        fn to_rust_impl(expr: &LispExpr, cx: &LateContext, bindings: &MatchBindings) -> (String, bool) {
+        fn to_rust_impl(
+            expr: &LispExpr,
+            cx: &LateContext,
+            bindings: &MatchBindings
+        ) -> (String, bool) {
             match *expr {
                 LispExpr::Binary(op, ref lhs, ref rhs) => {
                     match (to_rust_impl(lhs, cx, bindings), to_rust_impl(rhs, cx, bindings)) {
                         ((lhs, false), (rhs, false)) => {
                             (format!("{} {} {}", lhs, binop_to_string(op), rhs), true)
-                        },
+                        }
                         ((lhs, true), (rhs, false)) => {
                             (format!("({}) {} {}", lhs, binop_to_string(op), rhs), true)
-                        },
+                        }
                         ((lhs, false), (rhs, true)) => {
                             (format!("{} {} ({})", lhs, binop_to_string(op), rhs), true)
-                        },
+                        }
                         ((lhs, true), (rhs, true)) => {
                             (format!("({}) {} ({})", lhs, binop_to_string(op), rhs), true)
-                        },
+                        }
                     }
-                },
+                }
                 LispExpr::Fun(ref name, ref params) => {
                     let mut buf = String::new();
                     match to_rust_impl(&params[0], cx, bindings) {
@@ -427,7 +425,7 @@ impl LispExpr {
                             buf.push('(');
                             buf.push_str(&expr);
                             buf.push(')');
-                        },
+                        }
                     }
                     buf.push('.');
                     buf.push_str(name);
@@ -442,16 +440,14 @@ impl LispExpr {
 
                     buf.push(')');
                     (buf, false)
-                },
-                LispExpr::Lit(f) => {
-                    (format!("{}", f), false)
-                },
+                }
+                LispExpr::Lit(f) => (format!("{}", f), false),
                 LispExpr::Unary(op, ref expr) => {
                     match to_rust_impl(expr, cx, bindings) {
                         (expr, false) => (format!("{}{}", unop_to_string(op), expr), true),
                         (expr, true) => (format!("{}({})", unop_to_string(op), expr), true),
                     }
-                },
+                }
                 LispExpr::Ident(id) => {
                     match *bindings.bindings.get(&id).expect("Got an unbinded id!") {
                         MatchBinding::Field(_, ref path, ref name) => {
@@ -459,24 +455,23 @@ impl LispExpr {
                         },
                         MatchBinding::Ident(_, ref path) => {
                             (snippet(cx, path.span, "..").into_owned(), false)
-                        },
+                        }
                         MatchBinding::Lit(_, ref span) => {
                             (snippet(cx, *span, "..").into_owned(), false)
-                        },
+                        }
                         MatchBinding::Other(ref span) => {
                             (snippet(cx, *span, "..").into_owned(), true)
-                        },
+                        }
                         MatchBinding::TupField(_, ref path, ref idx) => {
                             (snippet(cx, merge_span(path.span, idx.span), "..").into_owned(), false)
                         },
                     }
-                },
+                }
             }
         }
 
         to_rust_impl(self, cx, bindings).0
     }
-
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -496,7 +491,6 @@ pub struct Parser {
 }
 
 impl Parser {
-
     pub fn new() -> Parser {
         Parser {
             ids: Vec::new(),
@@ -515,12 +509,13 @@ impl Parser {
                 else  {
                     Ok(result)
                 }
-            },
+            }
             err @ Err(..) => err,
         }
     }
 
-    fn parse_impl<It: Iterator<Item=char>>(&mut self, it: &mut It) -> Result<LispExpr, ParseError> {
+    fn parse_impl<It: Iterator<Item = char>>(&mut self, it: &mut It)
+    -> Result<LispExpr, ParseError> {
         match self.get_char(it, true) {
             Some('(') => {
                 match self.get_char(it, true) {
@@ -532,14 +527,14 @@ impl Parser {
                     Some(c) => {
                         self.put_back(c);
                         self.parse_fun(it)
-                    },
+                    }
                     None => Err(ParseError::EOE),
                 }
-            },
+            }
             Some(c) if c.is_digit(10) => {
                 self.put_back(c);
                 self.parse_float(it)
-            },
+            }
             Some(c) if c.is_alphanumeric() => {
                 self.put_back(c);
                 self.parse_ident(it)
@@ -552,7 +547,12 @@ impl Parser {
         }
     }
 
-    fn expect<It: Iterator<Item=char>>(&mut self, it: &mut It, c: char, skip_whitespace: bool) -> Result<(), ParseError> {
+    fn expect<It: Iterator<Item = char>>(
+        &mut self,
+        it: &mut It,
+        c: char,
+        skip_whitespace: bool
+    ) -> Result<(), ParseError> {
         if self.get_char(it, skip_whitespace) == Some(c) {
             Ok(())
         }
@@ -561,7 +561,8 @@ impl Parser {
         }
     }
 
-    fn parse_float<It: Iterator<Item=char>>(&mut self, it: &mut It) -> Result<LispExpr, ParseError> {
+    fn parse_float<It: Iterator<Item = char>>(&mut self, it: &mut It)
+    -> Result<LispExpr, ParseError> {
         let mut buf = String::new();
         loop {
             let c = self.get_char(it, false);
@@ -583,13 +584,14 @@ impl Parser {
         }
     }
 
-    fn parse_ident<It: Iterator<Item=char>>(&mut self, it: &mut It) -> Result<LispExpr, ParseError> {
+    fn parse_ident<It: Iterator<Item = char>>(&mut self, it: &mut It)
+    -> Result<LispExpr, ParseError> {
         // TODO: Herbie also supports ‘pi’ and ‘e’ as native constants.
         let mut buf = String::new();
         loop {
             let c = self.get_char(it, false);
             if let Some(c) = c {
-                if c.is_alphanumeric()  {
+                if c.is_alphanumeric() {
                     buf.push(c);
                     continue;
                 }
@@ -606,11 +608,12 @@ impl Parser {
         }
         else {
             self.ids.push(buf);
-            Ok(LispExpr::Ident(self.ids.len() as u64 -1))
+            Ok(LispExpr::Ident(self.ids.len() as u64 - 1))
         }
     }
 
-    fn parse_lambda<It: Iterator<Item=char>>(&mut self, it: &mut It) -> Result<LispExpr, ParseError> {
+    fn parse_lambda<It: Iterator<Item = char>>(&mut self, it: &mut It)
+    -> Result<LispExpr, ParseError> {
         loop {
             match it.next() {
                 Some(')') | None => break,
@@ -623,7 +626,8 @@ impl Parser {
         r
     }
 
-    fn parse_fun<It: Iterator<Item=char>>(&mut self, it: &mut It) -> Result<LispExpr, ParseError> {
+    fn parse_fun<It: Iterator<Item = char>>(&mut self, it: &mut It)
+    -> Result<LispExpr, ParseError> {
         let mut buf = String::new();
         loop {
             let c = self.get_char(it, false);
@@ -654,17 +658,18 @@ impl Parser {
                 }
                 else {
                     Err(ParseError::Arity)
-                }
+                };
             }
             else if buf == "sqr" && params.len() == 1 {
-                return Ok(LispExpr::Binary(BiMul, box params[0].clone(), box params.remove(0)))
+                return Ok(LispExpr::Binary(BiMul, box params[0].clone(), box params.remove(0)));
             }
         }
 
         Err(ParseError::Ident)
     }
 
-    fn parse_op<It: Iterator<Item=char>>(&mut self, it: &mut It, op: BinOp_) -> Result<LispExpr, ParseError> {
+    fn parse_op<It: Iterator<Item = char>>(&mut self, it: &mut It, op: BinOp_)
+    -> Result<LispExpr, ParseError> {
         // TODO: Herbie seems to also support the following for the repip of a float: (/ 42) and
         // rust has a function recip for that
         let lhs = try!(self.parse_impl(it));
@@ -681,7 +686,11 @@ impl Parser {
         r
     }
 
-    fn get_char<It: Iterator<Item=char>>(&mut self, it: &mut It, skip_whitespace: bool) -> Option<char> {
+    fn get_char<It: Iterator<Item = char>>(
+        &mut self,
+        it: &mut It,
+        skip_whitespace: bool
+    ) -> Option<char> {
         loop {
             match self.stack.pop() {
                 Some(e) if skip_whitespace && e.is_whitespace() => continue,
