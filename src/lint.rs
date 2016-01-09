@@ -179,16 +179,16 @@ fn try_with_herbie(cx: &LateContext, expr: &Expr, conf: &conf::Conf) -> Result<(
         .stderr(Stdio::piped())
     ;
 
-    let mut child = if let Ok(child) = command.spawn() {
-        child
-    }
-    else {
-        return if conf.use_herbie == conf::UseHerbieConf::Yes {
-            // TODO: wiki
-            Err("Could not call Herbie".into())
-        }
-        else {
-            Ok(())
+    let mut child = match command.spawn() {
+        Ok(child) => child,
+        Err(err) => {
+            return if conf.use_herbie == conf::UseHerbieConf::Yes {
+                // TODO: wiki
+                Err(format!("Could not call Herbie: {}", err).into())
+            }
+            else {
+                Ok(())
+            }
         }
     };
 
