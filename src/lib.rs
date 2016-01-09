@@ -27,6 +27,7 @@ extern crate rustc_serialize;
 extern crate syntax;
 extern crate toml;
 
+use syntax::feature_gate::AttributeType;
 use rustc_plugin::Registry;
 
 mod conf;
@@ -37,4 +38,6 @@ mod utils;
 #[plugin_registrar]
 pub fn plugin_registrar(reg: &mut Registry) {
     reg.register_late_lint_pass(box lint::Herbie::new());
+
+    reg.register_attribute("herbie_ignore".into(), AttributeType::Whitelisted);
 }

@@ -3,15 +3,17 @@ use itertools::Itertools;
 use lisp::LispExpr;
 use lisp;
 use rusqlite as sql;
+use rustc::front::map::Node;
 use rustc::lint::{LateContext, LintArray, LintContext, LintPass, LateLintPass};
 use rustc::middle::ty::TypeVariants;
 use rustc_front::hir::*;
-use std;
 use std::borrow::Cow;
 use std::io::Write;
 use std::process::{Command, Stdio};
 use std::str::from_utf8;
-use syntax::ast::FloatTy;
+use std;
+use syntax::ast::MetaItem_::MetaWord;
+use syntax::ast::{Attribute, FloatTy};
 
 #[derive(Debug)]
 pub struct Herbie {
@@ -121,6 +123,26 @@ impl LintPass for Herbie {
 
 impl LateLintPass for Herbie {
     fn check_expr(&mut self, cx: &LateContext, expr: &Expr) {
+        fn is_herbie_ignore(attr: &Attribute) -> bool {
+            if let MetaWord(ref word) = attr.node.value.node {
+                word == &"herbie_ignore"
+            }
+            else {
+                false
+            }
+        }
+
+        let attrs = match cx.tcx.map.find(cx.tcx.map.get_parent(expr.id)) {
+            Some(Node::NodeItem(item)) => &item.attrs,
+            Some(Node::NodeTraitItem(item)) => &item.attrs,
+            Some(Node::NodeImplItem(item)) => &item.attrs,
+            _ => panic!("In herbie-lint: how did I get there?"),
+        };
+
+        if attrs.iter().any(is_herbie_ignore) {
+            return;
+        }
+
         let ty = cx.tcx.expr_ty(expr);
 
         if ty.sty != TypeVariants::TyFloat(FloatTy::TyF64) {

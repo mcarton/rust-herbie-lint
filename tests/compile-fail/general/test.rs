@@ -1,9 +1,24 @@
 #![feature(plugin)]
 #![plugin(herbie_lint)]
 
+#![allow(dead_code)]
 #![deny(herbie)]
 
 struct Foo { a: f64, b: f64 }
+
+impl Foo {
+    fn foo(self) {
+        (self.a/self.a + self.a) * self.a;
+        //~^ ERROR
+        //~| HELP Try this
+        //~| SUGGESTION (self.a * self.a) + self.a
+    }
+
+    #[herbie_ignore]
+    fn bar(self) {
+        (self.a/self.a + self.a) * self.a;
+    }
+}
 
 fn get_f64() -> f64 {
     4.2
@@ -20,6 +35,23 @@ fn get_struct() -> Foo {
 fn integers() {
     1;
     (1/2 + 3) * 2;
+}
+
+#[herbie_ignore]
+fn attr_on_fn() {
+    (0./0. + 0.) * 0.;
+
+    fn foo() {
+        (0./0. + 0.) * 0.;
+        //~^ ERROR
+        //~| HELP Try this
+        //~| SUGGESTION (0. * 0.) + 0.
+    }
+
+    #[herbie_ignore]
+    fn bar() {
+        (0./0. + 0.) * 0.;
+    }
 }
 
 fn main() {
