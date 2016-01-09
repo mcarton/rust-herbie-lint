@@ -32,16 +32,27 @@ fn run_mode(mode: &'static str, dir: PathBuf, target_dir: &Path) {
     compiletest::run_tests(&config);
 
     if has_db_orig {
-        let Output { status, stdout, stderr } =
-            Command::new("sqldiff")
-            .arg("Herbie.dest.db").arg("Herbie.db")
+        let Output { status: status_dest, stdout: stdout_dest, stderr: stderr_dest } =
+            Command::new("sqlite3")
+            .arg("Herbie.dest.db").arg("select * from HerbieResults;")
             .output()
             .unwrap()
         ;
 
-        assert!(status.success());
-        assert!(stdout.is_empty(), "DB have diff:\n>>>\n{}<<<", String::from_utf8_lossy(&stdout));
+        let Output { status, stdout, stderr } =
+            Command::new("sqlite3")
+            .arg("Herbie.db").arg("select * from HerbieResults;")
+            .output()
+            .unwrap()
+        ;
+
+        assert_eq!(stdout_dest, stdout);
+
         assert!(stderr.is_empty(), "{}", String::from_utf8_lossy(&stderr));
+        assert!(stderr_dest.is_empty(), "{}", String::from_utf8_lossy(&stderr));
+
+        assert!(status_dest.success());
+        assert!(status.success());
 
         remove_file("Herbie.db").unwrap();
     }
