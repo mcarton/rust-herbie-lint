@@ -12,12 +12,12 @@ const DEFAULT_TIMEOUT: u32 = 120;
 
 #[derive(Debug, RustcDecodable)]
 pub struct UxConf {
-    /// Path to the database.
+    /// Path to the database. Defaults to "Herbie.db".
     pub db_path: Option<String>,
-    /// Maximum time in seconds that Herbie is allowed to play with an expression. If null, allow
     /// The seed use by Herbie. If not provided, a fixed seed will be used. Fixing the seed ensures
     /// deterministic builds.
     pub herbie_seed: Option<String>,
+    /// Maximum time in seconds that Herbie is allowed to play with an expression. If null, allow
     /// Herbie to run indefinitely. Default is two minutes.
     pub timeout: Option<u32>,
     /// Allow the plugin to call Herbie on unknown expressions. Positive results from Herbie will
