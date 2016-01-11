@@ -71,6 +71,25 @@ fn bar(a: f64, b: f64, c: f64) -> f64 {
 }
 ```
 
+You can also put a `Herbie.toml` file next to your `Cargo.toml` with the
+following fields:
+```toml
+# Path to the database.
+db_path = "Herbie.db"
+
+# The seed use by Herbie. If not provided, a fixed seed will be used. Fixing
+# the seed ensures deterministic builds.
+herbie_seed = "#(1461197085 2376054483 1553562171 1611329376 2497620867 2308122621)"
+
+# Allow the plugin to call Herbie on unknown expressions. Positive results from
+# Herbie will be cached in the database. WARNING: Herbie is slow.
+# If ‘true’, the plugin will fail if it cannot find the executable.
+# If ‘false’, the plugin will not try to run Herbie.
+# By default, the plugin will call the executable only if it's found, but won't
+# complain otherwise.
+use_herbie = false
+```
+
 [clippy-usage]: https://github.com/Manishearth/rust-clippy#usage
 [clippy]: https://github.com/Manishearth/rust-clippy
 [crate-svg]: https://img.shields.io/crates/v/herbie-lint.svg
