@@ -1,6 +1,6 @@
 extern crate compiletest_rs as compiletest;
 
-use std::env::{current_dir, set_current_dir, set_var, var};
+use std::env::{current_dir, set_var, var};
 use std::fs::{copy, read_dir, remove_file};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -17,7 +17,6 @@ fn run_mode(mode: &'static str, dir: PathBuf, target_dir: &Path) {
     let cfg_mode = mode.parse().ok().expect("Invalid mode");
     config.mode = cfg_mode;
 
-    set_current_dir(&dir).unwrap();
     config.src_base = current_dir().unwrap();
 
     let db_orig = Path::new("Herbie.orig.db");
@@ -27,7 +26,8 @@ fn run_mode(mode: &'static str, dir: PathBuf, target_dir: &Path) {
         copy(db_orig, "Herbie.db").is_ok();
     }
 
-    set_var("PATH", format!("{}:.", var("PATH").unwrap()));
+    // Test dirs might have its own "herbie-inout" script
+    set_var("PATH", format!("{}:{}", var("PATH").unwrap(), dir.to_str().unwrap()));
 
     compiletest::run_tests(&config);
 
