@@ -188,10 +188,15 @@ fn main() {
     1. - a.cos();
     //~^ ERROR
     //~| HELP Try this
-    //~| SUGGESTION (a.sin() * a.sin()) / a.cos().log1p().exp()
+    //~| SUGGESTION (a.sin() * a.sin()) / a.cos().ln_1p().exp()
 
     (a+b).sin() - (a+b).cos();
     //~^ ERROR
     //~| HELP Try this
     //~| SUGGESTION (b.sin() * (a.sin() + a.cos())) - ((a.cos() - a.sin()) * b.cos())
+
+    (a+1.).ln();
+    //~^ ERROR
+    //~| HELP Try this
+    //~| SUGGESTION a.ln_1p()
 }

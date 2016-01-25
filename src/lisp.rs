@@ -55,6 +55,12 @@ const KNOWN_FUNS : &'static [(&'static str, &'static str, usize)] = &[
     ("tanh",  "tanh",   1),
 ];
 
+fn rust_name(herbie_name: &str) -> Option<&'static str> {
+    KNOWN_FUNS .iter()
+               .find(|&&(name, _, _)| herbie_name == name)
+               .map(|&(_, rust_name, _)| rust_name)
+}
+
 fn herbie_name(rust_name: &str, nb_params: usize) -> Option<&'static str> {
     KNOWN_FUNS.iter()
               .find(|&&(_, name, params)| rust_name == name && nb_params == params)
@@ -428,7 +434,7 @@ impl LispExpr {
                         }
                     }
                     buf.push('.');
-                    buf.push_str(name);
+                    buf.push_str(rust_name(name).unwrap_or("_"));
                     buf.push('(');
 
                     for (i, p) in params.iter().skip(1).enumerate() {
