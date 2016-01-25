@@ -6,7 +6,9 @@ use syntax::codemap::{Span, mk_sp};
 /// `snippet(cx, expr.span, "..")`.
 /// From clippy.
 pub fn snippet<'a, T: LintContext>(cx: &T, span: Span, default: &'a str) -> Cow<'a, str> {
-    cx.sess().codemap().span_to_snippet(span).map(From::from).unwrap_or(Cow::Borrowed(default))
+    cx.sess().codemap().span_to_snippet(span)
+        .map(From::from)
+        .unwrap_or_else(|_| Cow::Borrowed(default))
 }
 
 /// Merge tow spans.
