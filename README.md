@@ -88,6 +88,10 @@ herbie_seed = "#(1461197085 2376054483 1553562171 1611329376 2497620867 23081226
 # By default, the plugin will call the executable only if it's found, but won't
 # complain otherwise.
 use_herbie = false
+
+# Maximum time in seconds that Herbie is allowed to play with an expression. If
+# null, allow Herbie to run indefinitely. Default is two minutes.
+timeout = 120
 ```
 
 [clippy-usage]: https://github.com/Manishearth/rust-clippy#usage
