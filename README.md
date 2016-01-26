@@ -3,7 +3,7 @@
 ## What
 
 This plugin can add warnings or errors to your crate when using a numerically
-instable floating point expression.
+unstable floating point expression.
 
 Quick example of what you can get when compiling
 [`tests/compile-fail/general/test.rs`][example]:
@@ -25,7 +25,7 @@ test.rs:155:5: 155:30 help: Try this
 test.rs:        (b.sin() * (a.sin() + a.cos())) - ((a.cos() - a.sin()) * b.cos());
 ```
 
-As you can see, it will report numerically instable expressions, and suggest a
+As you can see, it will report numerically unstable expressions, and suggest a
 (sometimes over-parenthesized) more stable correction.
 
 ## Usage
