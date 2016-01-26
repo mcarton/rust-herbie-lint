@@ -8,12 +8,12 @@ use rustc::lint::{LateContext, LintArray, LintContext, LintPass, LateLintPass};
 use rustc::middle::ty::TypeVariants;
 use rustc_front::hir::*;
 use std::borrow::Cow;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::process::{Command, Stdio};
-use std::str::from_utf8;
 use std;
 use syntax::ast::MetaItem_::MetaWord;
 use syntax::ast::{Attribute, FloatTy};
+use wait_timeout::ChildExt;
 
 #[derive(Debug)]
 pub struct Herbie {
@@ -226,22 +226,46 @@ fn try_with_herbie(cx: &LateContext, expr: &Expr, conf: &conf::Conf) -> Result<(
         .write(lisp_expr).expect("Could not write on herbie-inout's stdin")
     ;
 
-    let output = if let Ok(output) = child.wait_with_output() {
-        if output.status.success() {
-            if let Ok(output) = from_utf8(&output.stdout) {
-                output.to_owned()
-            }
-            else {
-                return Err("herbie-inout returned non-utf8".into());
+    match conf.timeout {
+        Some(timeout) => {
+            match child.wait_timeout_ms(timeout*1000) {
+                Ok(Some(status)) if status.success() => (),
+                Ok(Some(status)) => {
+                    return Err(format!("herbie-inout did not return successfully: status={}", status).into());
+                }
+                Ok(None) => {
+                    cx.sess().diagnostic().span_note_without_error(expr.span, "Herbie timed out");
+                    return Ok(());
+                }
+                Err(err) => {
+                    return Err(format!("herbie-inout did not return successfully: {}", err).into());
+                }
             }
         }
-        else {
-            return Err("herbie-inout did not return successfully".into());
+        None => {
+            match child.wait() {
+                Ok(status) if status.success() => (),
+                Ok(status) => {
+                    return Err(format!("herbie-inout did not return successfully: status={}", status).into());
+                }
+                Err(err) => {
+                    return Err(format!("herbie-inout did not return successfully: {}", err).into());
+                }
+            }
         }
     }
+
+    let mut stdout = if let Some(output) = child.stdout {
+        output
+    }
     else {
-        return Err("herbie-inout failed".into());
+        return Err("cannot capture herbie-inout output".into());
     };
+
+    let mut output = String::new();
+    if let Err(err) = stdout.read_to_string(&mut output) {
+        return Err(format!("cannot read output: {}", err).into());
+    }
 
     let mut output = output.lines();
 

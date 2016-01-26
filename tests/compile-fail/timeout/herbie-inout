@@ -1,0 +1,7 @@
+>&2 echo '(lambda; Seed: #(3921972770 291071987 162486221 1538155159 1506434654 2508651613)
+'
+
+echo '; Input error: 0.09765625'
+echo '; Output error: 0.0078125'
+sleep 10s
+echo '(λ (x y) (- y (/ y x)))'

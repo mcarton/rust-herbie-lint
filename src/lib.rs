@@ -26,6 +26,7 @@ extern crate rustc_front;
 extern crate rustc_serialize;
 extern crate syntax;
 extern crate toml;
+extern crate wait_timeout;
 
 use syntax::feature_gate::AttributeType;
 use rustc_plugin::Registry;
