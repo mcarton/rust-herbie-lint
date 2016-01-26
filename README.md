@@ -94,6 +94,9 @@ use_herbie = false
 timeout = 120
 ```
 
+More information about calling Herbie can be found in the
+[wiki][wiki-herbie-inout].
+
 [clippy-usage]: https://github.com/Manishearth/rust-clippy#usage
 [clippy]: https://github.com/Manishearth/rust-clippy
 [crate-svg]: https://img.shields.io/crates/v/herbie-lint.svg
@@ -105,3 +108,4 @@ timeout = 120
 [license]: https://github.com/mcarton/rust-herbie-lint/blob/master/LICENSE
 [travis-svg]: https://travis-ci.org/mcarton/rust-herbie-lint.svg
 [travis]: https://travis-ci.org/mcarton/rust-herbie-lint/
+[wiki-herbie-inout]: https://github.com/mcarton/rust-herbie-lint/wiki#how-to-use-herbie-optional
