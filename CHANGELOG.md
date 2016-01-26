@@ -1,6 +1,10 @@
 Change Log
 ==========
 
+1.0.4 — 2015-01-26
+* Implement a timeout when executing Herbie.
+* More documentation and wiki.
+
 1.0.3 — 2015-01-25
 * Fix bug in Rust expression reconstruction which displayed Herbie function
   names.
