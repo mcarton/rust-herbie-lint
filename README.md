@@ -97,6 +97,9 @@ timeout = 120
 More information about calling Herbie can be found in the
 [wiki][wiki-herbie-inout].
 
+## Acknowledgment
+Thanks to @llogiq for [the idea][idea].
+
 [clippy-usage]: https://github.com/Manishearth/rust-clippy#usage
 [clippy]: https://github.com/Manishearth/rust-clippy
 [crate-svg]: https://img.shields.io/crates/v/herbie-lint.svg
@@ -104,6 +107,7 @@ More information about calling Herbie can be found in the
 [example]: https://github.com/mcarton/rust-herbie-lint/blob/master/tests/compile-fail/general/test.rs
 [ghc-herbie-db]: https://github.com/mikeizbicki/HerbiePlugin/blob/master/data/Herbie.db?raw=true
 [ghc-herbie]: https://github.com/mikeizbicki/HerbiePlugin
+[idea]: https://github.com/Manishearth/rust-clippy/issues/346
 [license-svg]: https://img.shields.io/crates/l/herbie-lint.svg
 [license]: https://github.com/mcarton/rust-herbie-lint/blob/master/LICENSE
 [travis-svg]: https://travis-ci.org/mcarton/rust-herbie-lint.svg
