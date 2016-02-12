@@ -125,7 +125,7 @@ impl LispExpr {
                             Some(LispExpr::Ident(pos as u64))
                         }
                         else {
-                            push_new_binding(MatchBinding::Field(qualif.clone(), path.clone(), name.clone()), ids, curr_id)
+                            push_new_binding(MatchBinding::Field(qualif.clone(), path.clone(), *name), ids, curr_id)
                         }
                     }
                     else {
@@ -193,7 +193,7 @@ impl LispExpr {
                             Some(LispExpr::Ident(pos as u64))
                         }
                         else {
-                            push_new_binding(MatchBinding::TupField(qualif.clone(), path.clone(), idx.clone()), ids, curr_id)
+                            push_new_binding(MatchBinding::TupField(qualif.clone(), path.clone(), *idx), ids, curr_id)
                         }
                     }
                     else {
@@ -322,7 +322,7 @@ impl LispExpr {
                                 false
                             }
                         }, || {
-                            MatchBinding::TupField(qualif.clone(), path.clone(), idx.clone())
+                            MatchBinding::TupField(qualif.clone(), path.clone(), *idx)
                         })
                     }
 
@@ -341,7 +341,7 @@ impl LispExpr {
                                 false
                             }
                         }, || {
-                            MatchBinding::Field(qualif.clone(), path.clone(), name.clone())
+                            MatchBinding::Field(qualif.clone(), path.clone(), *name)
                         })
                     }
 

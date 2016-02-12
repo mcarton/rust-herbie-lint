@@ -24,31 +24,31 @@ pub struct Herbie {
 
 #[derive(Debug)]
 pub enum InitError {
-    ConfError {
+    Conf {
         error: conf::ConfError,
     },
-    SQLError {
+    SQL {
         error: sql::Error,
     },
 }
 
 impl From<conf::ConfError> for InitError {
     fn from(err: conf::ConfError) -> InitError {
-        InitError::ConfError { error: err }
+        InitError::Conf { error: err }
     }
 }
 
 impl From<sql::Error> for InitError {
     fn from(err: sql::Error) -> InitError {
-        InitError::SQLError { error: err }
+        InitError::SQL { error: err }
     }
 }
 
 impl std::fmt::Display for InitError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         match *self {
-            InitError::ConfError { ref error } => write!(f, "Configuration error: {}", error),
-            InitError::SQLError { ref error } => write!(f, "Got SQL error: {}", error),
+            InitError::Conf { ref error } => write!(f, "Configuration error: {}", error),
+            InitError::SQL { ref error } => write!(f, "Got SQL error: {}", error),
         }
     }
 }
@@ -269,7 +269,7 @@ fn try_with_herbie(cx: &LateContext, expr: &Expr, conf: &conf::Conf) -> Result<(
 
     let mut output = output.lines();
 
-    fn parse_error(s: Option<&str>) -> Option<f64> {
+    let parse_error = |s: Option<&str>| -> Option<f64> {
         match s {
             Some(s) => {
                 match s.split(' ').last().map(str::parse::<f64>) {
@@ -279,7 +279,7 @@ fn try_with_herbie(cx: &LateContext, expr: &Expr, conf: &conf::Conf) -> Result<(
             }
             _ => None,
         }
-    }
+    };
 
     let (errin, errout, cmdout) = match (parse_error(output.next()), parse_error(output.next()), output.next()) {
         (Some(errin), Some(errout), Some(cmdout)) => {
