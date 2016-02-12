@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::iter::FromIterator;
 use std;
-use syntax::ast::Lit_::*;
+use syntax::ast::LitKind;
 use syntax::ast::{FloatTy, Name};
 use syntax::codemap::{Span, Spanned};
 use utils::{merge_span, snippet};
@@ -134,8 +134,8 @@ impl LispExpr {
                 }
                 ExprLit(ref lit) => {
                     match lit.node {
-                        LitFloat(ref f, FloatTy::TyF64)
-                        | LitFloatUnsuffixed(ref f) => {
+                        LitKind::Float(ref f, FloatTy::F64)
+                        | LitKind::FloatUnsuffixed(ref f) => {
                             f.parse().ok().map(LispExpr::Lit)
                         }
                         _ => None,
@@ -276,7 +276,8 @@ impl LispExpr {
                 }
                 (&ExprLit(ref lit), &LispExpr::Lit(r)) => {
                     match lit.node {
-                        LitFloat(ref f, FloatTy::TyF64) | LitFloatUnsuffixed(ref f) => {
+                        LitKind::Float(ref f, FloatTy::F64)
+                        | LitKind::FloatUnsuffixed(ref f) => {
                             f.parse() == Ok(r)
                         }
                         _ => false,
@@ -284,7 +285,8 @@ impl LispExpr {
                 }
                 (&ExprLit(ref expr), &LispExpr::Ident(rid)) => {
                     match expr.node {
-                        LitFloat(ref lit, FloatTy::TyF64) | LitFloatUnsuffixed(ref lit) => {
+                        LitKind::Float(ref lit, FloatTy::F64)
+                        | LitKind::FloatUnsuffixed(ref lit) => {
                             if let Ok(lit) = lit.parse() {
                                 try_insert(rid, ids, |entry| {
                                     if let MatchBinding::Lit(binded, _) = *entry {

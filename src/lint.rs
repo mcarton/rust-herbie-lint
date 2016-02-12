@@ -11,7 +11,7 @@ use std::borrow::Cow;
 use std::io::{Read, Write};
 use std::process::{Command, Stdio};
 use std;
-use syntax::ast::MetaItem_::MetaWord;
+use syntax::ast::MetaItemKind;
 use syntax::ast::{Attribute, FloatTy};
 use wait_timeout::ChildExt;
 
@@ -124,7 +124,7 @@ impl LintPass for Herbie {
 impl LateLintPass for Herbie {
     fn check_expr(&mut self, cx: &LateContext, expr: &Expr) {
         fn is_herbie_ignore(attr: &Attribute) -> bool {
-            if let MetaWord(ref word) = attr.node.value.node {
+            if let MetaItemKind::Word(ref word) = attr.node.value.node {
                 word == &"herbie_ignore"
             }
             else {
@@ -145,7 +145,7 @@ impl LateLintPass for Herbie {
 
         let ty = cx.tcx.expr_ty(expr);
 
-        if ty.sty != TypeVariants::TyFloat(FloatTy::TyF64) {
+        if ty.sty != TypeVariants::TyFloat(FloatTy::F64) {
             return;
         }
 
