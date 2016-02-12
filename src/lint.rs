@@ -10,6 +10,7 @@ use rustc_front::hir::*;
 use std::borrow::Cow;
 use std::io::{Read, Write};
 use std::process::{Command, Stdio};
+use std::time::Duration;
 use std;
 use syntax::ast::MetaItemKind;
 use syntax::ast::{Attribute, FloatTy};
@@ -228,7 +229,7 @@ fn try_with_herbie(cx: &LateContext, expr: &Expr, conf: &conf::Conf) -> Result<(
 
     match conf.timeout {
         Some(timeout) => {
-            match child.wait_timeout_ms(timeout*1000) {
+            match child.wait_timeout(Duration::from_secs(timeout as u64)) {
                 Ok(Some(status)) if status.success() => (),
                 Ok(Some(status)) => {
                     return Err(format!("herbie-inout did not return successfully: status={}", status).into());
