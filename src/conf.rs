@@ -82,24 +82,24 @@ impl From<UxConf> for Conf {
 
 #[derive(Debug)]
 pub enum ConfError {
-    IOError {
+    Io {
         error: IOError,
     },
-    ParseError,
+    Parse,
 }
 
 impl std::fmt::Display for ConfError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         match *self {
-            ConfError::IOError{ ref error } => write!(f, "Error reading Herbie.toml: {}", error),
-            ConfError::ParseError => write!(f, "Syntax error in Herbie.toml"),
+            ConfError::Io{ ref error } => write!(f, "Error reading Herbie.toml: {}", error),
+            ConfError::Parse => write!(f, "Syntax error in Herbie.toml"),
         }
     }
 }
 
 impl From<IOError> for ConfError {
     fn from(err: IOError) -> ConfError {
-        ConfError::IOError { error: err }
+        ConfError::Io { error: err }
     }
 }
 
@@ -112,7 +112,7 @@ pub fn read_conf() -> Result<Conf, ConfError> {
             Ok(conf.into())
         }
         else {
-            Err(ConfError::ParseError)
+            Err(ConfError::Parse)
         }
     }
     else {

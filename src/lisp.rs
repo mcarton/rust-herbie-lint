@@ -396,9 +396,8 @@ impl LispExpr {
         match *self {
             LispExpr::Binary(_, ref lhs, ref rhs) => 1 + std::cmp::max(lhs.depth(), rhs.depth()),
             LispExpr::Fun(_, ref params) => 1 + params.iter().map(Self::depth).max().unwrap_or(0),
-            LispExpr::Lit(_) => 0,
+            LispExpr::Lit(_) | LispExpr::Ident(_) => 0,
             LispExpr::Unary(_, ref expr) => expr.depth(),
-            LispExpr::Ident(_) => 0,
         }
     }
 
