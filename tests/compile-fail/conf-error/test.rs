@@ -5,6 +5,7 @@
 
 #![allow(unused_variables)]
 #![deny(herbie)]
+//~^NOTE: lint level defined here
 
 fn main() {
     let a = 42.;
