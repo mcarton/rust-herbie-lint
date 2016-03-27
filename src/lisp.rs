@@ -217,6 +217,7 @@ impl LispExpr {
 
     pub fn match_expr(matchee: &Expr, other: &LispExpr) -> Option<MatchBindings> {
 
+        #[allow(similar_names)]
         fn match_expr_impl(
             lhs: &Expr,
             rhs: &LispExpr,
@@ -491,7 +492,7 @@ pub enum ParseError {
     EOE,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Parser {
     ids: Vec<String>,
     stack: Vec<char>,
@@ -499,10 +500,7 @@ pub struct Parser {
 
 impl Parser {
     pub fn new() -> Parser {
-        Parser {
-            ids: Vec::new(),
-            stack: Vec::new(),
-        }
+        Parser::default()
     }
 
     pub fn parse(&mut self, s: &str) -> Result<LispExpr, ParseError> {

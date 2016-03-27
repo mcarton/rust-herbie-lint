@@ -16,7 +16,7 @@ use syntax::ast::MetaItemKind;
 use syntax::ast::{Attribute, FloatTy};
 use wait_timeout::ChildExt;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Herbie {
     conf: Option<conf::Conf>,
     initialized: bool,
@@ -56,11 +56,7 @@ impl std::fmt::Display for InitError {
 
 impl Herbie {
     pub fn new() -> Herbie {
-        Herbie {
-            conf: None,
-            initialized: false,
-            subs: Vec::new(),
-        }
+        Herbie::default()
     }
 
     pub fn init(&mut self) -> Result<(), InitError> {
@@ -71,10 +67,10 @@ impl Herbie {
         self.initialized = true;
 
         let conf = try!(conf::read_conf());
-        let conn = try!(sql::Connection::open_with_flags(
+        let connection = try!(sql::Connection::open_with_flags(
             conf.db_path.as_ref(), sql::SQLITE_OPEN_READ_ONLY
         ));
-        let mut query = try!(conn.prepare("SELECT * FROM HerbieResults"));
+        let mut query = try!(connection.prepare("SELECT * FROM HerbieResults"));
 
         self.subs = try!(query.query(&[])).filter_map(|row| {
             match row {
@@ -319,13 +315,13 @@ fn save(
     seed: &str,
     errin: f64, errout: f64
 ) -> Result<(), sql::Error> {
-    let conn = try!(sql::Connection::open_with_flags(
+    let connection = try!(sql::Connection::open_with_flags(
         conf.db_path.as_ref(), sql::SQLITE_OPEN_READ_WRITE
     ));
 
-    try!(conn.execute("INSERT INTO HerbieResults (cmdin, cmdout, opts, errin, errout)
-                       VALUES ($1, $2, $3, $4, $5)",
-                       &[&cmdin, &cmdout.to_lisp("herbie"), &seed, &errin, &errout]));
+    try!(connection.execute("INSERT INTO HerbieResults (cmdin, cmdout, opts, errin, errout)
+                             VALUES ($1, $2, $3, $4, $5)",
+                            &[&cmdin, &cmdout.to_lisp("herbie"), &seed, &errin, &errout]));
 
     Ok(())
 }
