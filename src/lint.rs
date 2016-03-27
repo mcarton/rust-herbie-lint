@@ -5,7 +5,7 @@ use lisp;
 use rusqlite as sql;
 use rustc::front::map::Node;
 use rustc::lint::{LateContext, LintArray, LintContext, LintPass, LateLintPass};
-use rustc::middle::ty::TypeVariants;
+use rustc::ty::TypeVariants;
 use rustc_front::hir::*;
 use std::borrow::Cow;
 use std::io::{Read, Write};
