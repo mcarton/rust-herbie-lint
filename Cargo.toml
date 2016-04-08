@@ -6,7 +6,7 @@ license = "MPL-2.0"
 name = "herbie-lint"
 readme = "README.md"
 repository = "https://github.com/mcarton/rust-herbie-lint"
-version = "1.0.6"
+version = "1.0.7"
 
 [lib]
 name = "herbie_lint"
