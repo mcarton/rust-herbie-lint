@@ -26,13 +26,13 @@ impl std::fmt::Debug for LispExpr {
     }
 }
 
-/// List (herbie_name, rust_name).
+/// List `(herbie_name, rust_name)`.
 /// Warning: *MUST* be alphabetized on Herbie name.
 /// Herbie also supports the following:
-///   * cot (cotangent),
-///   * expt (Rust has powi vs. powf),
-///   * mod,
-///   * sqr (square),
+///   * `cot` (cotangent),
+///   * `expt` (Rust has `powi` vs. `powf`),
+///   * `mod`,
+///   * `sqr` (square),
 const KNOWN_FUNS : &'static [(&'static str, &'static str, usize)] = &[
     ("abs",   "abs",    1),
     ("acos",  "acos",   1),
