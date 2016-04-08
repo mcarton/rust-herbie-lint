@@ -216,7 +216,7 @@ impl LispExpr {
 
     pub fn match_expr(matchee: &Expr, other: &LispExpr) -> Option<MatchBindings> {
 
-        #[allow(similar_names)]
+        #[cfg_attr(feature="clippy", allow(similar_names))]
         fn match_expr_impl(
             lhs: &Expr,
             rhs: &LispExpr,
