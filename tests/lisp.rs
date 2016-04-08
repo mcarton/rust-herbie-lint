@@ -2,12 +2,12 @@
 
 #[allow(plugin_as_library)]
 extern crate herbie_lint;
-extern crate rustc_front;
+extern crate rustc;
 
 use herbie_lint::lisp::{LispExpr, Parser, ParseError};
 use herbie_lint::lisp::LispExpr::*;
-use rustc_front::hir::BinOp_::*;
-use rustc_front::hir::UnOp::*;
+use rustc::hir::BinOp_::*;
+use rustc::hir::UnOp::*;
 
 pub fn parse(s: &str) -> Result<LispExpr, ParseError> {
     let mut parser = Parser::new();

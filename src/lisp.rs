@@ -1,8 +1,7 @@
 #![cfg_attr(feature="clippy", allow(float_cmp))]
 
+use rustc::hir::*;
 use rustc::lint::LateContext;
-use rustc_front::hir::*;
-use rustc_front::util::{binop_to_string, unop_to_string};
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::iter::FromIterator;
@@ -367,7 +366,7 @@ impl LispExpr {
             LispExpr::Binary(op, ref lhs, ref rhs) => {
                 format!(
                     "({} {} {})",
-                    binop_to_string(op),
+                    op.as_str(),
                     lhs.to_lisp(placeholder),
                     rhs.to_lisp(placeholder)
                 )
@@ -387,7 +386,7 @@ impl LispExpr {
             }
             LispExpr::Lit(f) => format!("{}", f),
             LispExpr::Unary(op, ref expr) => {
-                format!("({} {})", unop_to_string(op), expr.to_lisp(placeholder))
+                format!("({} {})", op.as_str(), expr.to_lisp(placeholder))
             }
             LispExpr::Ident(id) => format!("{}{}", placeholder, id),
         }
@@ -412,16 +411,16 @@ impl LispExpr {
                 LispExpr::Binary(op, ref lhs, ref rhs) => {
                     match (to_rust_impl(lhs, cx, bindings), to_rust_impl(rhs, cx, bindings)) {
                         ((lhs, false), (rhs, false)) => {
-                            (format!("{} {} {}", lhs, binop_to_string(op), rhs), true)
+                            (format!("{} {} {}", lhs, op.as_str(), rhs), true)
                         }
                         ((lhs, true), (rhs, false)) => {
-                            (format!("({}) {} {}", lhs, binop_to_string(op), rhs), true)
+                            (format!("({}) {} {}", lhs, op.as_str(), rhs), true)
                         }
                         ((lhs, false), (rhs, true)) => {
-                            (format!("{} {} ({})", lhs, binop_to_string(op), rhs), true)
+                            (format!("{} {} ({})", lhs, op.as_str(), rhs), true)
                         }
                         ((lhs, true), (rhs, true)) => {
-                            (format!("({}) {} ({})", lhs, binop_to_string(op), rhs), true)
+                            (format!("({}) {} ({})", lhs, op.as_str(), rhs), true)
                         }
                     }
                 }
@@ -452,8 +451,8 @@ impl LispExpr {
                 LispExpr::Lit(f) => (format!("{}", f), false),
                 LispExpr::Unary(op, ref expr) => {
                     match to_rust_impl(expr, cx, bindings) {
-                        (expr, false) => (format!("{}{}", unop_to_string(op), expr), true),
-                        (expr, true) => (format!("{}({})", unop_to_string(op), expr), true),
+                        (expr, false) => (format!("{}{}", op.as_str(), expr), true),
+                        (expr, true) => (format!("{}({})", op.as_str(), expr), true),
                     }
                 }
                 LispExpr::Ident(id) => {
