@@ -109,7 +109,7 @@ fn main() {
     (a/b + (42 as f64)) * b;
     //~^ ERROR
     //~| HELP Try this
-    //~| SUGGESTION ((42 as f64) * b) + a
+    //~| SUGGESTION (((42 as f64)) * b) + a
     (a/b + { 42. }) * b;
     //~^ ERROR
     //~| HELP Try this
