@@ -77,7 +77,7 @@ following fields:
 # Path to the database.
 db_path = "Herbie.db"
 
-# The seed use by Herbie. If not provided, a fixed seed will be used. Fixing
+# The seed used by Herbie. If not provided, a fixed seed will be used. Fixing
 # the seed ensures deterministic builds.
 herbie_seed = "#(1461197085 2376054483 1553562171 1611329376 2497620867 2308122621)"
 
